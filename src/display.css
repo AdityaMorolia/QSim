@@ -1,0 +1,137 @@
+.display-page {
+  margin: 0;
+  color: #24354b;
+  background: #fbfbfa;
+  font-size: 16px;
+  line-height: 1.4;
+}
+.display-page #app { min-height: 100dvh; }
+.display-page .visually-hidden { position: absolute; width: 1px; height: 1px; padding: 0; margin: -1px; overflow: hidden; clip: rect(0, 0, 0, 0); white-space: nowrap; border: 0; }
+.display-page .fullscreen-control {
+  position: fixed; z-index: 5; right: 25px; top: 16px; min-height: 36px; padding: 6px 10px;
+  font: inherit; font-size: 13px; background: #fbfbfaed; border: 1px solid #d8dcde; border-radius: 7px;
+  color: #65768a; opacity: 0; transition: opacity .25s; cursor: pointer;
+}
+.display-page .fullscreen-control.is-visible, .display-page .fullscreen-control:focus-visible { opacity: 1; }
+.display-brand { display: flex; align-items: center; gap: 13px; min-height: 32px; color: #344a63; font-size: 13px; font-weight: 650; letter-spacing: .13em; text-transform: uppercase; }
+.brand-orbit { color: #0c4f9b; font-size: 30px; line-height: 1; }
+.brand-divider { color: #cad0d7; font-size: 19px; font-weight: 400; margin: 0 3px; }
+.display-edition { color: #667688; font-weight: 500; }
+.experiment-screen { box-sizing: border-box; width: 100%; min-height: 100dvh; padding: 22px 42px 18px; display: grid; grid-template-rows: 32px auto auto 1fr auto; gap: 15px; }
+.experiment-heading { display: flex; align-items: center; justify-content: space-between; gap: 24px; }
+.experiment-heading h1 { font-size: clamp(28px, 3.15vw, 45px); line-height: 1.13; letter-spacing: -.045em; font-weight: 600; margin: 7px 0 10px; }
+.experiment-heading p { color: #6e7c8a; font-size: 21px; line-height: 1.35; margin: 0; }
+.run-meta { display: flex; align-items: flex-end; flex-direction: column; gap: 8px; white-space: nowrap; padding-top: 8px; }
+.step-counter { font-size: 18px; color: #617184; font-variant-numeric: tabular-nums; }
+.step-counter strong { font-size: 26px; font-weight: 500; color: #24354b; margin-left: 5px; }
+.playback-state { font-size: 13px; color: #617184; display: flex; align-items: center; gap: 7px; }
+.status-dot { width: 6px; height: 6px; border-radius: 50%; background: #939eaa; }
+.status-dot.playing { background: #0c4f9b; }
+.status-dot.complete { background: #008b85; }
+.example-tag { text-transform: uppercase; font-size: 10px; font-weight: 700; letter-spacing: .1em; border: 1px solid #d6c7e5; color: #8053ab; border-radius: 4px; padding: 3px 7px; }
+.display-circuit { background-color: #f5f7f9; background-image: radial-gradient(#cbd4de70 .75px, transparent .75px); background-size: 13px 13px; border: 1px solid #e0e5e9; border-radius: 12px; padding: 4px 18px; }
+.display-circuit .circuit-diagram { height: 117px; }
+.qubits-2 .display-circuit .circuit-diagram { height: 150px; }
+.state-panels { display: grid; grid-template-columns: 1fr 1.02fr; gap: 48px; padding-top: 8px; min-height: 0; align-items: start; }
+.measurement-panel, .bloch-panel { min-width: 0; }
+.bloch-panel { border-left: 1px solid #e0e5e9; padding-left: 40px; }
+.panel-heading { display: flex; align-items: center; gap: 10px; }
+.section-index { font: 12px ui-monospace, monospace; color: #617184; border: 1px solid #dce2e8; padding: 4px; border-radius: 4px; }
+.panel-heading h2 { margin: 0; font-size: 22px; font-weight: 550; line-height: 1.25; letter-spacing: -.025em; }
+.probability-table { width: 100%; border-collapse: collapse; table-layout: fixed; margin-top: 15px; }
+.probability-table thead th { text-align: left; font-size: 13px; color: #617184; font-weight: 500; padding: 0 0 10px; }
+.probability-table thead th:first-child { width: 25%; }
+.probability-table thead th:nth-child(2) { width: 42%; }
+.probability-table thead th:last-child { text-align: right; }
+.probability-table tbody tr { border-top: 1px solid #e0e5e9; }
+.probability-table tbody th, .probability-table tbody td { padding: 10px 0; text-align: left; height: 54px; box-sizing: border-box; }
+.probability-table .ket { font-family: ui-monospace, 'SFMono-Regular', Consolas, monospace; font-size: 29px; font-weight: 400; letter-spacing: -.06em; }
+.probability-cell { padding-right: 20px !important; }
+.probability-value { display: block; font-size: 26px; font-weight: 550; font-variant-numeric: tabular-nums; line-height: 1.1; }
+.percent { font-size: 16px; color: #617184; font-weight: 400; margin-left: 3px; }
+.probability-track { display: block; height: 4px; background: #e5eaf0; border-radius: 3px; margin-top: 7px; width: 100%; overflow: hidden; }
+.probability-track > span { display: block; height: 100%; background: #0c4f9b; border-radius: inherit; }
+.probability-table td.amplitude { font-family: ui-monospace, 'SFMono-Regular', Consolas, monospace; text-align: right; font-size: 24px; color: #8053ab; letter-spacing: -.045em; }
+.probability-table td.amplitude.is-zero { color: #778493; }
+.panel-caption { font-size: 12px; color: #617184; margin: 10px 0 0; line-height: 1.4; }
+.sphere-grid { display: grid; grid-template-columns: 1fr; margin-top: 12px; }
+.qubits-2 .sphere-grid { grid-template-columns: 1fr 1fr; gap: 7px; }
+.sphere-cell { min-width: 0; text-align: center; }
+.sphere-label { display: flex; justify-content: center; gap: 10px; align-items: center; font: 15px ui-monospace, monospace; color: #0c4f9b; }
+.sphere-label span { font: 11px system-ui, sans-serif; color: #617184; letter-spacing: .01em; }
+.bloch-sphere { display: block; width: 100%; max-width: 290px; height: 225px; margin: 0 auto; overflow: visible; }
+.qubits-2 .bloch-sphere { height: 205px; }
+.bloch-caption { text-align: center; margin-top: 5px; }
+.display-feedback { border-top: 1px solid #dce2e7; min-height: 33px; padding-top: 14px; display: flex; gap: 10px; align-items: center; font-size: 17px; font-weight: 500; }
+.feedback-message { min-width: 0; flex: 1; overflow-wrap: break-word; }
+.feedback-dot { width: 7px; height: 7px; border-radius: 50%; background: #0c4f9b; flex-shrink: 0; }
+.display-feedback.success { color: #007f75; }
+.display-feedback.success .feedback-dot { background: #008b85; }
+.display-feedback.retry { color: #916232; }
+.display-feedback.retry .feedback-dot { background: #c69b62; }
+.display-feedback.neutral { color: #617184; font-weight: 400; }
+.display-feedback.neutral .feedback-dot { background: #a5b0bb; }
+.state-note { margin-left: auto; font-size: 11px; color: #617184; font-weight: 400; white-space: nowrap; }
+.welcome-screen { min-height: 100dvh; box-sizing: border-box; padding: 33px 54px 27px; display: flex; flex-direction: column; overflow: hidden; }
+.welcome-body { flex: 1; display: grid; grid-template-columns: 1.1fr 1fr; align-items: center; max-width: 1450px; width: 100%; margin: 0 auto; }
+.welcome-copy { padding-left: 10px; position: relative; z-index: 1; }
+.welcome-kicker { display: flex; align-items: center; gap: 9px; font-size: 12px; color: #718193; letter-spacing: .13em; text-transform: uppercase; }
+.welcome-kicker span { width: 7px; height: 7px; border-radius: 50%; background: #008b85; }
+.welcome-copy h1 { font-size: clamp(45px, 5.15vw, 82px); font-weight: 550; letter-spacing: -.065em; line-height: 1.08; margin: 26px 0; }
+.welcome-copy h1 span { color: #0c4f9b; }
+.welcome-copy p { color: #778596; font-size: clamp(20px, 2vw, 28px); line-height: 1.55; margin: 0; }
+.welcome-footnote { font-size: 13px; color: #617184; margin-top: 40px; }
+.welcome-art { width: 110%; margin-left: -7%; max-height: 64vh; }
+.welcome-bottom { display: flex; justify-content: space-between; border-top: 1px solid #e0e5e9; padding-top: 19px; font-size: 12px; color: #8b98a5; }
+.welcome-bottom span:last-child { font-family: ui-monospace, monospace; letter-spacing: .15em; color: #b0bac3; }
+@media (min-width: 1500px) and (min-height: 850px) {
+  .experiment-screen { padding: 35px 60px 28px; gap: 23px; }
+  .display-circuit .circuit-diagram { height: 160px; }
+  .qubits-2 .display-circuit .circuit-diagram { height: 205px; }
+  .panel-heading h2 { font-size: 29px; }
+  .probability-table tbody th, .probability-table tbody td { padding: 16px 0; }
+  .probability-table .ket { font-size: 35px; }
+  .probability-value { font-size: 32px; }
+  .probability-table td.amplitude { font-size: 29px; }
+  .bloch-sphere, .qubits-2 .bloch-sphere { height: 275px; max-width: 350px; }
+  .panel-caption { font-size: 15px; }
+}
+@media (max-height: 740px) and (min-width: 900px) {
+  .experiment-screen { padding: 18px 35px 14px; gap: 10px; }
+  .experiment-heading h1 { font-size: 36px; margin-top: 4px; margin-bottom: 7px; }
+  .experiment-heading p { font-size: 19px; }
+  .qubits-2 .display-circuit .circuit-diagram { height: 137px; }
+  .qubits-2 .sphere-grid { margin-top: 12px; }
+  .qubits-2 .bloch-sphere { height: 194px; }
+  .qubits-2 .probability-table { margin-top: 10px; }
+  .qubits-2 .probability-table tbody th, .qubits-2 .probability-table tbody td { padding: 6px 0; height: 52px; }
+  .qubits-2 .probability-value { font-size: 24px; }
+  .qubits-2 .probability-table .ket { font-size: 27px; }
+  .display-feedback { min-height: 26px; padding-top: 11px; }
+}
+@media (max-width: 899px) {
+  .experiment-screen { padding: 20px; display: flex; flex-direction: column; gap: 20px; }
+  .display-brand { font-size: 10px; gap: 8px; }
+  .display-edition, .brand-divider { display: none; }
+  .experiment-heading { align-items: flex-start; gap: 12px; }
+  .experiment-heading h1 { font-size: 30px; }
+  .experiment-heading p { font-size: 17px; }
+  .run-meta { gap: 4px; }
+  .step-counter { font-size: 12px; }
+  .step-counter strong { font-size: 20px; }
+  .display-circuit { overflow-x: auto; padding: 5px; }
+  .display-circuit .circuit-diagram { min-width: 610px; }
+  .state-panels { grid-template-columns: 1fr; gap: 28px; }
+  .bloch-panel { border-left: 0; border-top: 1px solid #dce2e7; padding: 25px 0 0; }
+  .bloch-sphere, .qubits-2 .bloch-sphere { height: 240px; }
+  .display-feedback { font-size: 15px; }
+  .state-note { display: none; }
+  .welcome-screen { padding: 25px; }
+  .welcome-body { grid-template-columns: 1fr; }
+  .welcome-copy { padding: 40px 0 0; }
+  .welcome-copy h1 { font-size: clamp(44px, 9vw, 70px); }
+  .welcome-copy p { font-size: 20px; }
+  .welcome-art { max-height: 38vh; width: 100%; margin: 0; }
+  .welcome-footnote { display: none; }
+}
+@media (prefers-reduced-motion: reduce) { .display-page .fullscreen-control { transition: none; } }
