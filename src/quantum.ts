@@ -1,4 +1,4 @@
-import { EPSILON, MAX_GATES } from './config.ts';
+import { EPSILON, MAX_GATES, MAX_QUBITS } from './config.ts';
 import type { Circuit, Complex, Feedback, Operation, SingleGate, State } from './types.ts';
 
 const c = (re: number, im = 0): Complex => ({ re, im });
@@ -32,14 +32,14 @@ function isOperation(value: unknown, qubits: number): value is Operation {
 export function isValidCircuit(value: unknown): value is Circuit {
   if (!value || typeof value !== 'object') return false;
   const circuit = value as Partial<Circuit>;
-  return Array.isArray(circuit.initial) && circuit.initial.length >= 1 && circuit.initial.length <= 2
+  return Array.isArray(circuit.initial) && circuit.initial.length >= 1 && circuit.initial.length <= MAX_QUBITS
     && circuit.initial.every(value => value === '0' || value === '+')
     && Array.isArray(circuit.operations) && circuit.operations.length <= MAX_GATES
     && circuit.operations.every(operation => isOperation(operation, circuit.initial!.length));
 }
 
 export function initialState(circuit: Circuit): State {
-  if (!isValidCircuit(circuit)) throw new Error('Use one or two qubits and at most eight valid gates.');
+  if (!isValidCircuit(circuit)) throw new Error(`Use one to ${MAX_QUBITS} qubits and at most ${MAX_GATES} valid gates.`);
   let state: State = [c(1)];
   for (const initial of circuit.initial) {
     const factor = initial === '+' ? SQRT_HALF : 1;
@@ -50,9 +50,9 @@ export function initialState(circuit: Circuit): State {
 
 export function applyGate(state: State, operation: Operation): State {
   const qubits = Math.log2(state.length);
-  if ((qubits !== 1 && qubits !== 2) || !isOperation(operation, qubits)) throw new Error('Invalid gate or state size.');
+  if (!Number.isInteger(qubits) || qubits < 1 || qubits > MAX_QUBITS || !isOperation(operation, qubits)) throw new Error('Invalid gate or state size.');
   const next = state.map(a => ({ ...a }));
-  // q0 is the top wire and most significant (leftmost) bit: 00, 01, 10, 11.
+  // q0 is the top wire and most significant (leftmost) bit: 000, 001, …, 111.
   const targetMask = 1 << (qubits - 1 - operation.target);
   if (operation.gate === 'CNOT') {
     const controlMask = 1 << (qubits - 1 - operation.control);
@@ -92,10 +92,10 @@ export function fidelity(actual: State, target: State): number {
 
 export function blochVector(state: State, qubit: number): { x: number; y: number; z: number } {
   const qubits = Math.log2(state.length);
-  if ((qubits !== 1 && qubits !== 2) || !Number.isInteger(qubit) || qubit < 0 || qubit >= qubits) throw new Error('Invalid qubit.');
+  if (!Number.isInteger(qubits) || qubits < 1 || qubits > MAX_QUBITS || !Number.isInteger(qubit) || qubit < 0 || qubit >= qubits) throw new Error('Invalid qubit.');
   const mask = 1 << (qubits - 1 - qubit);
   const vector = { x: 0, y: 0, z: 0 };
-  // Summing out the other wire gives the local mixed state. Entanglement can shorten this vector.
+  // Summing out the other wires gives the local mixed state. Entanglement can shorten this vector.
   for (let index = 0; index < state.length; index++) {
     if (index & mask) continue;
     const a = state[index];

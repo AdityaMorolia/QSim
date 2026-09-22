@@ -9,7 +9,7 @@ export const GATES: { gate: GateKind; name: string; description: string }[] = [
   { gate: 'X', name: 'Bit flip', description: 'Swap |0⟩ and |1⟩.' },
   { gate: 'Y', name: 'Y gate', description: 'Swap the states and change their phases.' },
   { gate: 'Z', name: 'Sign flip', description: 'Change the sign of the |1⟩ amplitude.' },
-  { gate: 'P', name: 'Phase gate', description: 'Multiply the |1⟩ amplitude by i. Also called S.' },
+  { gate: 'P', name: 'Phase gate', description: 'Multiply the |1⟩ amplitude by i. Also called S: a quarter-turn phase, not Z.' },
   { gate: 'CNOT', name: 'Controlled NOT', description: 'Flip the target when the control is |1⟩. Place it on the target wire.' },
 ];
 
@@ -21,7 +21,7 @@ export const PUZZLES: Puzzle[] = [
     examples: [{ label: 'One little flip', explanation: 'X swaps the two states, taking |0⟩ to |1⟩.', circuit: { initial: ['0'], operations: [{ gate: 'X', target: 0 }] } }],
   },
   {
-    id: '2', number: 2, title: 'Be in a super position', shortTitle: 'Super position', kind: 'target',
+    id: '2', number: 2, title: 'Quantum superposition', shortTitle: 'Superposition', kind: 'target',
     prompt: 'Make an equal superposition with matching signs.', goal: '(|0⟩ + |1⟩)/√2', concept: 'Mix two possibilities',
     starter: empty(), target: state(h, h), hint: 'H mixes the two amplitudes. Try it on the starting state.',
     examples: [{ label: 'A little H magic', explanation: 'H takes |0⟩ to an equal superposition: (|0⟩ + |1⟩)/√2.', circuit: { initial: ['0'], operations: [{ gate: 'H', target: 0 }] } }],
@@ -60,7 +60,7 @@ export const PUZZLES: Puzzle[] = [
   },
   {
     id: 'free', number: 0, title: 'Free play', shortTitle: 'Free play', kind: 'free',
-    prompt: 'Follow your curiosity. Build a circuit and see where it takes you.', goal: 'Explore one or two qubits', concept: 'Your own experiment',
+    prompt: '', goal: 'Explore up to three qubits', concept: 'Your own experiment',
     starter: empty(), hint: 'Try two H gates in a row, or explore what P does to a superposition.', examples: [],
   },
 ];

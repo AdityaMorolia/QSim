@@ -48,6 +48,58 @@ test('top wire is the most significant bit and both CNOT directions work', () =>
   sameState(applyGate(top, { gate: 'CNOT', control: 1, target: 0 }), top);
 });
 
+test('three-qubit CNOT truth tables cover every ordered pair and all eight basis states', () => {
+  for (const control of [0, 1, 2]) {
+    for (const target of [0, 1, 2]) {
+      if (control === target) continue;
+      for (let basis = 0; basis < 8; basis++) {
+        const bits = basis.toString(2).padStart(3, '0').split('');
+        if (bits[control] === '1') bits[target] = bits[target] === '0' ? '1' : '0';
+        const expected = Number.parseInt(bits.join(''), 2);
+        const state = Array.from({ length: 8 }, (_, index) => ({ re: Number(index === basis), im: 0 }));
+        const output = applyGate(state, { gate: 'CNOT', control, target });
+        assert.deepEqual(probabilities(output), Array.from({ length: 8 }, (_, index) => Number(index === expected)));
+      }
+    }
+  }
+  const start = initialState({ initial: ['0', '0', '0'], operations: [] });
+  assert.equal(start.length, 8);
+  for (const [qubit, index] of [[0, 4], [1, 2], [2, 1]]) {
+    assert.equal(probabilities(applyGate(start, { gate: 'X', target: qubit })).indexOf(1), index);
+  }
+});
+
+test('GHZ entangles all three qubits while a separated pair leaves the middle qubit pure', () => {
+  const ghzFrames = simulate({ initial: ['0', '0', '0'], operations: [
+    { gate: 'H', target: 0 }, { gate: 'CNOT', control: 0, target: 1 }, { gate: 'CNOT', control: 1, target: 2 },
+  ] });
+  for (const frame of ghzFrames) close(probabilities(frame).reduce((sum, p) => sum + p, 0), 1);
+  const ghz = ghzFrames.at(-1)!;
+  probabilities(ghz).forEach((p, index) => close(p, index === 0 || index === 7 ? 0.5 : 0));
+  close(ghz[0].re, Math.SQRT1_2); close(ghz[7].re, Math.SQRT1_2);
+  for (const q of [0, 1, 2]) Object.values(blochVector(ghz, q)).forEach(value => close(value, 0));
+
+  const pair = final({ initial: ['0', '0', '0'], operations: [{ gate: 'H', target: 0 }, { gate: 'CNOT', control: 0, target: 2 }] });
+  probabilities(pair).forEach((p, index) => close(p, index === 0 || index === 5 ? 0.5 : 0));
+  for (const q of [0, 2]) Object.values(blochVector(pair, q)).forEach(value => close(value, 0));
+  const middle = blochVector(pair, 1);
+  close(middle.x, 0); close(middle.y, 0); close(middle.z, 1);
+});
+
+test('three-qubit initial states and phases on the bottom wire preserve wire order', () => {
+  const plus = initialState({ initial: ['+', '+', '+'], operations: [] });
+  assert.equal(plus.length, 8);
+  plus.forEach(a => { close(a.re, 1 / Math.sqrt(8)); close(a.im, 0); });
+  const phased = final({ initial: ['0', '0', '+'], operations: [{ gate: 'P', target: 2 }] });
+  sameState(phased, [
+    { re: Math.SQRT1_2, im: 0 }, { re: 0, im: Math.SQRT1_2 },
+    ...Array.from({ length: 6 }, () => ({ re: 0, im: 0 })),
+  ]);
+  const bottom = blochVector(phased, 2);
+  close(bottom.x, 0); close(bottom.y, 1); close(bottom.z, 0);
+  for (const q of [0, 1]) close(blochVector(phased, q).z, 1);
+});
+
 test('forward/backward circuits have equal chances but different phases and Bloch vectors', () => {
   const [hp, ph] = getPuzzle('4').examples.map(example => final(example.circuit));
   probabilities(hp).forEach((p, index) => close(p, probabilities(ph)[index]));
@@ -95,9 +147,17 @@ test('representative frames stay normalized without mutating their inputs', () =
 });
 
 test('circuit validation rejects unsupported sizes, gates, and wire references', () => {
-  for (const invalid of [null, {}, { initial: [], operations: [] }, { initial: ['0', '0', '0'], operations: [] }, { initial: ['1'], operations: [] }, { initial: ['0'], operations: Array(9).fill({ gate: 'H', target: 0 }) }, ...[
+  for (const invalid of [null, {}, { initial: [], operations: [] }, { initial: ['0', '0', '0', '0'], operations: [] }, { initial: ['1'], operations: [] }, { initial: ['0'], operations: Array(9).fill({ gate: 'H', target: 0 }) }, ...[
     { gate: 'H', target: 1 }, { gate: 'H', target: -1 }, { gate: 'H', target: 0.5 }, { gate: 'T', target: 0 }, { gate: 'toString', target: 0 }, { gate: 'CNOT', control: 0, target: 0 }, { gate: 'CNOT', control: 1, target: 0 },
   ].map(operation => ({ initial: ['0'], operations: [operation] }))]) assert.equal(isValidCircuit(invalid), false);
   assert.equal(isValidCircuit({ initial: ['0', '+'], operations: [{ gate: 'CNOT', control: 1, target: 0 }] }), true);
+  assert.equal(isValidCircuit({ initial: ['0', '0', '+'], operations: [{ gate: 'CNOT', control: 2, target: 0 }] }), true);
+  assert.equal(isValidCircuit({ initial: ['0', '0', '0'], operations: [{ gate: 'H', target: 3 }] }), false);
+  assert.equal(isValidCircuit({ initial: ['0', '0', '0'], operations: [{ gate: 'CNOT', control: 3, target: 0 }] }), false);
   assert.equal(isValidCircuit({ initial: ['0'], operations: Array(8).fill({ gate: 'H', target: 0 }) }), true);
+  for (const length of [3, 16]) {
+    const invalidState = Array.from({ length }, () => ({ re: 0, im: 0 }));
+    assert.throws(() => applyGate(invalidState, { gate: 'H', target: 0 }));
+    assert.throws(() => blochVector(invalidState, 0));
+  }
 });

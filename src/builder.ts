@@ -1,5 +1,5 @@
 import './style.css';
-import { MAX_GATES, STEP_MS, SESSION_KEY } from './config.ts';
+import { MAX_GATES, MAX_QUBITS, STEP_MS, SESSION_KEY } from './config.ts';
 import type { Circuit, Feedback, GateKind, Operation, Run } from './types.ts';
 import { PUZZLES, GATES, getPuzzle, cloneCircuit } from './puzzles.ts';
 import { circuitSignature, isValidCircuit, simulate, targetFeedback } from './quantum.ts';
@@ -24,7 +24,11 @@ const undo: Record<string, Draft[]> = {};
 const expanded = new Set<string>();
 let published = readSnapshot();
 let revision = published?.revision ?? 0;
-const sync = createSync(() => {}, () => { if (published) sync.publish(published); });
+const sync = createSync(() => {}, () => { if (published) sync.publish(published); }, () => {
+  if (run?.status === 'playing') return;
+  if (locked()) playbackAction('play');
+  else launch();
+});
 
 function loadVisitor(): Visitor {
   try {
@@ -72,7 +76,7 @@ const arrow = '<span aria-hidden="true">↗</span>';
 
 function render() {
   const focused = document.activeElement as HTMLElement | null;
-  const focusAttributes = ['data-action', 'data-gate', 'data-place', 'data-target', 'data-index', 'data-puzzle', 'data-variant', 'data-qubits', 'data-example'];
+  const focusAttributes = ['data-action', 'data-gate', 'data-place', 'data-target', 'data-index', 'data-puzzle', 'data-variant', 'data-qubits', 'data-example', 'data-control'];
   const focusSelector = focused && app.contains(focused) ? focusAttributes.filter(key => focused.hasAttribute(key)).map(key => `[${key}="${CSS.escape(focused.getAttribute(key)!)}"]`).join('') : '';
   const puzzle = getPuzzle(visitor.selected);
   const current = locked() && run ? { circuit: run.circuit, example: run.example, variant: run.variant } : draft();
@@ -86,32 +90,29 @@ function render() {
   app.innerHTML = `
     <header class="site-header">
       <a class="brand" href="./" aria-label="Quantum Playground home">${logo}<span>Quantum<span class="brand-light"> Playground</span></span></a>
-      <span class="header-tag">SMALL CIRCUITS. BIG IDEAS.</span>
-      <div class="header-actions"><button class="quiet-button" data-action="new" ${disable(!!locked())}>New visitor</button><button class="outline-button" data-action="display">Open display ${arrow}</button></div>
+      <div class="header-actions"><button class="quiet-button" data-action="new" ${disable(!!locked())}>Reset</button><button class="outline-button" data-action="display">Open display ${arrow}</button></div>
     </header>
     <div class="builder-layout">
       <aside class="sidebar" aria-label="Choose an experiment">
         <div class="sidebar-heading"><span class="eyebrow">YOUR EXPERIMENTS</span><span class="progress-count">${PUZZLES.filter(p => p.kind !== 'free' && progress(p.id).solved).length}/6</span></div>
         <nav class="puzzle-nav">${PUZZLES.map(p => `<button class="puzzle-link ${p.id === puzzle.id ? 'is-current' : ''} ${p.kind === 'free' ? 'free-link' : ''}" data-puzzle="${p.id}" ${p.id === puzzle.id ? 'aria-current="page"' : ''} ${disable(!!locked())}><span class="puzzle-number ${progress(p.id).solved ? 'is-solved' : ''}">${progress(p.id).solved ? '✓' : p.kind === 'free' ? '∞' : String(p.number).padStart(2, '0')}</span><span>${escapeHtml(p.shortTitle)}</span><span class="nav-arrow" aria-hidden="true">›</span></button>`).join('')}</nav>
-        <div class="sidebar-note"><span class="little-orbit" aria-hidden="true">✳</span><p>A little curiosity goes a long way.</p><span>Build. Launch. Wonder.</span></div>
-        <div class="sidebar-bottom"><span class="status-dot"></span> All experiments run right here.</div>
+        <div class="sidebar-note"><span class="little-orbit" aria-hidden="true">✳</span><p>A little curiosity goes a long way.</p></div>
       </aside>
       <main class="workspace">
-        <div class="workspace-heading"><div><div class="eyebrow"><span class="eyebrow-line"></span>${puzzle.kind === 'free' ? 'MAKE SOMETHING YOUR OWN' : `EXPERIMENT ${String(puzzle.number).padStart(2, '0')} / 06`}</div><h1>${escapeHtml(puzzle.title)}</h1><p class="puzzle-prompt">${escapeHtml(puzzle.prompt)}</p></div><span class="concept-pill">${escapeHtml(puzzle.concept)}</span></div>
+        <div class="workspace-heading"><div><div class="eyebrow"><span class="eyebrow-line"></span>${puzzle.kind === 'free' ? 'MAKE SOMETHING YOUR OWN' : `EXPERIMENT ${String(puzzle.number).padStart(2, '0')} / 06`}</div><h1>${escapeHtml(puzzle.title)}</h1>${puzzle.prompt ? `<p class="puzzle-prompt">${escapeHtml(puzzle.prompt)}</p>` : ''}</div><span class="concept-pill">${escapeHtml(puzzle.concept)}</span></div>
         <div class="goal-strip"><span class="goal-icon" aria-hidden="true">◎</span><div><span class="small-label">${puzzle.kind === 'compare' ? 'THE QUESTION' : puzzle.kind === 'free' ? 'YOUR LAB' : 'YOUR MISSION'}</span><span class="goal-text">${escapeHtml(puzzle.goal)}</span></div>${puzzle.kind === 'two-ways' ? `<span class="ways-count">${Math.min(2, state.signatures.length)} / 2 ways</span>` : ''}</div>
         <section class="lab-panel" aria-label="Circuit builder">
           <div class="lab-toolbar"><div><span class="section-label">${puzzle.kind === 'compare' ? 'Choose an order' : 'Your gate collection'}</span><span class="toolbar-hint">${puzzle.kind === 'compare' ? 'Two circuits. One small change.' : 'Click to choose · drag to explore'}</span></div>${current.example ? '<span class="example-badge">EXAMPLE</span>' : `<span class="gate-count">${count} / ${MAX_GATES} gates</span>`}</div>
-          ${puzzle.kind === 'compare' ? `<div class="comparison-options">${puzzle.examples.map((ex, i) => `<button data-variant="${i}" class="comparison-button ${current.variant === i ? 'is-active' : ''}" ${disable(!!locked())}><span class="small-label">CIRCUIT ${i === 0 ? 'A' : 'B'} ${state.compared.includes(i) ? '· COMPARED' : ''}</span>${escapeHtml(ex.label)}</button>`).join('')}</div>` : `<div class="gate-palette">${GATES.filter(g => circuit.initial.length === 2 || g.gate !== 'CNOT').map(g => `<button class="palette-gate ${gateClass(g.gate)} ${selectedGate === g.gate ? 'is-selected' : ''}" data-gate="${g.gate}" aria-label="${g.gate}: ${escapeHtml(g.description)}" aria-pressed="${selectedGate === g.gate}" title="${escapeHtml(g.description)}" ${disable(!!locked() || count >= MAX_GATES)}><span class="gate-letter">${g.gate === 'CNOT' ? '⊕' : g.gate}</span><span class="gate-name">${g.gate === 'CNOT' ? 'CNOT' : escapeHtml(g.name)}</span></button>`).join('')}<div class="palette-note"><span class="small-label">${selectedGate ? 'SELECTED GATE' : 'A RECIPE FOR A QUANTUM STATE'}</span><span>${selectedGate ? escapeHtml(GATES.find(g => g.gate === selectedGate)!.description) : 'Each gate changes what happens next.'}</span></div></div>`}
-          ${puzzle.kind === 'free' ? `<div class="qubit-picker"><span>Start with</span><button data-qubits="1" class="${circuit.initial.length === 1 ? 'is-active' : ''}" ${disable(!!locked())}>1 qubit</button><button data-qubits="2" class="${circuit.initial.length === 2 ? 'is-active' : ''}" ${disable(!!locked())}>2 qubits</button></div>` : ''}
+          ${puzzle.kind === 'compare' ? `<div class="comparison-options">${puzzle.examples.map((ex, i) => `<button data-variant="${i}" class="comparison-button ${current.variant === i ? 'is-active' : ''}" ${disable(!!locked())}><span class="small-label">CIRCUIT ${i === 0 ? 'A' : 'B'} ${state.compared.includes(i) ? '· COMPARED' : ''}</span>${escapeHtml(ex.label)}</button>`).join('')}</div>` : `<div class="gate-palette">${GATES.filter(g => circuit.initial.length > 1 || g.gate !== 'CNOT').map(g => `<button class="palette-gate ${gateClass(g.gate)} ${selectedGate === g.gate ? 'is-selected' : ''}" data-gate="${g.gate}" aria-label="${g.gate}: ${escapeHtml(g.description)}" aria-pressed="${selectedGate === g.gate}" title="${escapeHtml(g.description)}" ${disable(!!locked() || count >= MAX_GATES)}><span class="gate-letter">${g.gate === 'CNOT' ? '⊕' : g.gate}</span><span class="gate-name">${g.gate === 'CNOT' ? 'CNOT' : escapeHtml(g.name)}</span></button>`).join('')}${selectedGate ? `<div class="palette-note"><span class="small-label">SELECTED GATE</span><span>${escapeHtml(GATES.find(g => g.gate === selectedGate)!.description)}</span></div>` : ''}</div>`}
+          ${puzzle.kind === 'free' ? `<div class="qubit-picker"><span>Start with</span>${Array.from({ length: MAX_QUBITS }, (_, index) => index + 1).map(n => `<button data-qubits="${n}" class="${circuit.initial.length === n ? 'is-active' : ''}" aria-pressed="${circuit.initial.length === n}" ${disable(!!locked())}>${n} qubit${n > 1 ? 's' : ''}</button>`).join('')}</div>` : ''}
           <div class="circuit-stage ${selectedGate ? 'has-tool' : ''}" aria-label="Circuit, left to right">${editorMarkup(circuit)}</div>
-          <div class="circuit-caption"><span>${puzzle.kind === 'compare' ? 'These circuits are ready to launch. Watch how their states differ.' : count >= MAX_GATES ? 'Eight gates is the limit. Move or remove a gate to keep exploring.' : selectedGate === 'CNOT' ? 'Place on the qubit to flip. The other wire becomes the control.' : count === 0 ? 'Your circuit starts here. Choose a gate, then click + on a wire.' : 'Time moves left to right. Click a gate to edit it.'}</span><span class="flow-label">TIME <span aria-hidden="true">→</span></span></div>
-          <div class="selection-tools" aria-label="Selected gate controls">${active && editable() ? `<span class="selection-label"><span class="selected-chip ${gateClass(active.gate)}">${active.gate}</span> Step ${selectedIndex! + 1}</span><button data-action="left" ${disable(selectedIndex === 0)} aria-label="Move selected gate left">← Move</button><button data-action="right" ${disable(selectedIndex === count - 1)} aria-label="Move selected gate right">Move →</button>${circuit.initial.length === 2 ? `<button data-action="switch">${active.gate === 'CNOT' ? 'Reverse direction' : 'Switch wire'}</button>` : ''}<button class="delete-button" data-action="delete">Delete</button>` : `<span class="selection-placeholder">${puzzle.kind === 'compare' ? 'Same gates. Different order. What changes?' : 'No gate selected'}</span>`}</div>
-          <div class="lab-footer"><div class="edit-actions"><button class="quiet-button" data-action="undo" ${disable(!editable() || !(undo[puzzle.id]?.length))}><span aria-hidden="true">↶</span> Undo</button><button class="quiet-button" data-action="reset" ${disable(!editable())}>Reset attempt</button></div><div class="launch-group"><span class="draft-status"><span class="status-dot ${changed ? 'is-pending' : ''}"></span>${status}</span><button class="launch-button" data-action="launch" ${disable(!!locked())}>Launch circuit <span aria-hidden="true">↗</span></button></div></div>
+          <div class="circuit-caption"><span>${puzzle.kind === 'compare' ? 'These circuits are ready to launch. Watch how their states differ.' : count >= MAX_GATES ? 'Eight gates is the limit. Move or remove a gate to keep exploring.' : selectedGate === 'CNOT' ? (circuit.initial.length === 2 ? 'Place on the qubit to flip. The other wire becomes the control.' : 'Place on the qubit to flip, then choose its control wire below.') : count === 0 ? 'Your circuit starts here. Choose a gate, then click + on a wire.' : 'Time moves left to right. Click a gate to edit it.'}</span><span class="flow-label">TIME <span aria-hidden="true">→</span></span></div>
+          <div class="selection-tools" aria-label="Selected gate controls">${active && editable() ? `<span class="selection-label"><span class="selected-chip ${gateClass(active.gate)}">${active.gate}</span> Step ${selectedIndex! + 1}</span><button data-action="left" ${disable(selectedIndex === 0)} aria-label="Move selected gate left">← Move</button><button data-action="right" ${disable(selectedIndex === count - 1)} aria-label="Move selected gate right">Move →</button>${circuit.initial.length > 1 ? `<button data-action="switch">${active.gate === 'CNOT' ? 'Reverse direction' : 'Switch wire'}</button>` : ''}${active.gate === 'CNOT' && circuit.initial.length > 2 ? `<span class="control-label">Control:</span>${circuit.initial.map((_, q) => q === active.target ? '' : `<button class="control-choice" data-control="${q}" aria-pressed="${active.control === q}" aria-label="Use qubit ${q} as control">q${q}</button>`).join('')}` : ''}<button class="delete-button" data-action="delete">Delete</button>` : `<span class="selection-placeholder">${puzzle.kind === 'compare' ? 'Same gates. Different order. What changes?' : 'No gate selected'}</span>`}</div>
+          <div class="lab-footer"><div class="edit-actions"><button class="quiet-button" data-action="undo" ${disable(!editable() || !(undo[puzzle.id]?.length))}><span aria-hidden="true">↶</span> Undo</button><button class="quiet-button" data-action="reset" ${disable(!editable())}>Reset attempt</button></div><div class="launch-group"><span class="draft-status"><span class="status-dot ${changed ? 'is-pending' : ''}"></span>${status}</span><button class="launch-button" data-action="launch" ${disable(!!locked())}>Run <span aria-hidden="true">↗</span></button></div></div>
         </section>
         ${run ? playbackMarkup() : ''}
-        <div class="feedback-slot" role="status" aria-live="polite">${notice ? `<p class="notice">${escapeHtml(notice)}</p>` : runningThis && run && run.feedback ? `<p class="feedback feedback-${run.feedback.tone}"><span aria-hidden="true">${run.feedback.tone === 'success' ? '✦' : '◎'}</span>${escapeHtml(run.feedback.text)}</p>` : `<p class="resting-note"><span aria-hidden="true">↗</span> Your experiment comes to life on the display when you launch.</p>`}${puzzle.kind === 'two-ways' && state.signatures.length === 1 && !locked() ? '<button class="outline-button" data-action="another">Try another way →</button>' : ''}</div>
-        <div class="help-grid">${helpMarkup('hint', 'A little nudge', 'Hint', `<p>${escapeHtml(puzzle.hint)}</p>`)}${helpMarkup('solution', 'See one way to do it', 'Show a solution', puzzle.examples.map((ex, i) => `<div class="example-card"><strong>${escapeHtml(ex.label)}</strong><p>${escapeHtml(ex.explanation)}</p>${circuitSvg(ex.circuit)}${puzzle.kind !== 'compare' ? `<button class="outline-button" data-example="${i}" ${disable(!!locked())}>Load example</button>` : ''}</div>`).join('') || '<p>There is no right answer here. Try a gate, then see what changes.</p>')}${helpMarkup('gates', 'Meet the building blocks', 'Gate guide', `<dl class="gate-guide">${GATES.map(g => `<div><dt class="${gateClass(g.gate)}">${g.gate}</dt><dd>${escapeHtml(g.description)}${g.gate === 'P' ? ' Also called S: a quarter-turn phase, not Z.' : ''}</dd></div>`).join('')}</dl><p class="help-footnote">Amplitudes include signs and phases. Squaring their size gives the chance of each outcome. Overall phase does not change a physical state.</p>`)}</div>
-        <footer class="workspace-footer"><span>Made for curious minds.</span><span>1–2 qubits <span aria-hidden="true">·</span> Endless little discoveries</span></footer>
+        <div class="feedback-slot" role="status" aria-live="polite">${notice ? `<p class="notice">${escapeHtml(notice)}</p>` : runningThis && run && run.feedback ? `<p class="feedback feedback-${run.feedback.tone}"><span aria-hidden="true">${run.feedback.tone === 'success' ? '✦' : '◎'}</span>${escapeHtml(run.feedback.text)}</p>` : ''}${puzzle.kind === 'two-ways' && state.signatures.length === 1 && !locked() ? '<button class="outline-button" data-action="another">Try another way →</button>' : ''}</div>
+        <div class="help-grid">${helpMarkup('hint', '', 'Hint', `<p>${escapeHtml(puzzle.hint)}</p>`)}${helpMarkup('solution', 'See one way to do it', 'Show a solution', puzzle.examples.map((ex, i) => `<div class="example-card"><strong>${escapeHtml(ex.label)}</strong><p>${escapeHtml(ex.explanation)}</p>${circuitSvg(ex.circuit)}${puzzle.kind !== 'compare' ? `<button class="outline-button" data-example="${i}" ${disable(!!locked())}>Load example</button>` : ''}</div>`).join('') || '<p>There is no right answer here. Try a gate, then see what changes.</p>')}${helpMarkup('gates', 'Meet the building blocks', 'Gate guide', `<dl class="gate-guide">${GATES.map(g => `<div><dt class="${gateClass(g.gate)}">${g.gate}</dt><dd>${escapeHtml(g.description)}</dd></div>`).join('')}</dl><p class="help-footnote">Amplitudes include signs and phases. Squaring their size gives the chance of each outcome. Overall phase does not change a physical state.</p>`)}</div>
       </main>
     </div>`;
   if (focusSelector) app.querySelector<HTMLButtonElement>(focusSelector)?.focus({ preventScroll: true });
@@ -119,7 +120,11 @@ function render() {
 
 function helpMarkup(key: string, subtitle: string, title: string, content: string) {
   const id = `${visitor.selected}:${key}`;
-  return `<details class="help-card" data-help="${id}" ${expanded.has(id) ? 'open' : ''}><summary><span><span class="help-title">${title}</span><span class="help-subtitle">${subtitle}</span></span><span class="help-plus" aria-hidden="true">+</span></summary><div class="help-content">${content}</div></details>`;
+  return `<details class="help-card" data-help="${id}" ${expanded.has(id) ? 'open' : ''}><summary><span><span class="help-title">${title}</span>${subtitle ? `<span class="help-subtitle">${subtitle}</span>` : ''}</span><span class="help-plus" aria-hidden="true">+</span></summary><div class="help-content">${content}</div></details>`;
+}
+
+function controlLink(control: number, target: number) {
+  return `<i class="control-link" style="top:${36 + Math.min(control, target) * 72}px;height:${Math.abs(control - target) * 72}px"></i>`;
 }
 
 function editorMarkup(circuit: Circuit) {
@@ -130,7 +135,7 @@ function editorMarkup(circuit: Circuit) {
     const op = circuit.operations[index];
     if (!op) break;
     const applied = !editing && run?.puzzleId === visitor.selected && run.step - 1 === index;
-    html += `<div class="gate-column ${gateClass(op.gate)} ${selectedIndex === index ? 'is-selected' : ''} ${applied ? 'is-applied' : ''}" data-column="${index}">${op.gate === 'CNOT' ? '<i class="control-link"></i>' : ''}${circuit.initial.map((_, q) => `<div class="gate-slot">${op.target === q || (op.gate === 'CNOT' && op.control === q) ? `<button class="circuit-gate ${op.gate === 'CNOT' && op.control === q ? 'control-gate' : ''}" data-index="${index}" aria-label="${op.gate}, step ${index + 1}, ${op.gate === 'CNOT' ? `control qubit ${op.control}, target qubit ${op.target}` : `qubit ${q}`}" ${disable(!editable())}>${op.gate === 'CNOT' && op.control === q ? '<span class="control-dot"></span>' : gateSymbol(op.gate)}</button>` : ''}</div>`).join('')}<span class="step-number">${index + 1}</span></div>`;
+    html += `<div class="gate-column ${gateClass(op.gate)} ${selectedIndex === index ? 'is-selected' : ''} ${applied ? 'is-applied' : ''}" data-column="${index}">${op.gate === 'CNOT' ? controlLink(op.control, op.target) : ''}${circuit.initial.map((_, q) => `<div class="gate-slot">${op.target === q || (op.gate === 'CNOT' && op.control === q) ? `<button class="circuit-gate ${op.gate === 'CNOT' && op.control === q ? 'control-gate' : ''}" data-index="${index}" aria-label="${op.gate}, step ${index + 1}, ${op.gate === 'CNOT' ? `control qubit ${op.control}, target qubit ${op.target}` : `qubit ${q}`}" ${disable(!editable())}>${op.gate === 'CNOT' && op.control === q ? '<span class="control-dot"></span>' : gateSymbol(op.gate)}</button>` : ''}</div>`).join('')}<span class="step-number">${index + 1}</span></div>`;
   }
   return html + '<div class="wire-end" aria-hidden="true">›</div></div>';
 }
@@ -152,18 +157,26 @@ function commit(circuit: Circuit, example = draft().example, variant = draft().v
   render();
 }
 
+function placedOperation(gate: GateKind, target: number, source?: number): Operation {
+  if (gate !== 'CNOT') return { gate, target };
+  const previous = source === undefined ? undefined : draft().circuit.operations[source];
+  // Keep a moved CNOT's control when possible; new gates use the first other wire.
+  const control = previous?.gate === 'CNOT' && previous.control !== target ? previous.control : target === 0 ? 1 : 0;
+  return { gate, target, control };
+}
+
 // Clicks, keyboard buttons and pointer dragging all enter the same edit path.
 function place(gate: GateKind, insertion: number, target: number, source?: number) {
   if (!editable()) return;
   const circuit = cloneCircuit(draft().circuit);
-  if (target < 0 || target >= circuit.initial.length || (gate === 'CNOT' && circuit.initial.length !== 2)) return;
+  if (target < 0 || target >= circuit.initial.length || (gate === 'CNOT' && circuit.initial.length < 2)) return;
   if (source === undefined && circuit.operations.length >= MAX_GATES) return;
+  const operation = placedOperation(gate, target, source);
   let at = insertion;
   if (source !== undefined) {
     circuit.operations.splice(source, 1);
     if (source < at) at--;
   }
-  const operation: Operation = gate === 'CNOT' ? { gate, target, control: 1 - target } : { gate, target };
   circuit.operations.splice(at, 0, operation);
   selectedIndex = at;
   commit(circuit);
@@ -309,7 +322,7 @@ app.addEventListener('click', event => {
   if (action && ['play', 'previous', 'next', 'replay', 'edit'].includes(action)) { playbackAction(action); return; }
   if (action === 'display') {
     displayWindow = window.open(new URL('display.html', location.href), 'quantum-playground-display', 'popup,width=1280,height=720');
-    notice = displayWindow ? 'Move the display window to the monitor, then use its fullscreen button.' : 'The browser blocked the window. Allow pop-ups, or open display.html in a second window.';
+    notice = displayWindow ? 'Move the display window to the monitor. Use your browser’s fullscreen command to hide its toolbar.' : 'The browser blocked the window. Allow pop-ups, or open display.html in a second window.';
     render(); return;
   }
   if (action === 'new') {
@@ -327,15 +340,20 @@ app.addEventListener('click', event => {
   if (selectedIndex === null || !editable()) return;
   const circuit = cloneCircuit(draft().circuit);
   const index = selectedIndex;
-  if (action === 'delete') { circuit.operations.splice(index, 1); selectedIndex = null; }
+  if (data.control !== undefined) {
+    const op = circuit.operations[index];
+    const control = Number(data.control);
+    if (op.gate !== 'CNOT' || control === op.target) return;
+    op.control = control;
+  } else if (action === 'delete') { circuit.operations.splice(index, 1); selectedIndex = null; }
   else if (action === 'left' || action === 'right') {
     const next = index + (action === 'left' ? -1 : 1);
     [circuit.operations[index], circuit.operations[next]] = [circuit.operations[next], circuit.operations[index]];
     selectedIndex = next;
   } else if (action === 'switch') {
     const op = circuit.operations[index];
-    op.target = 1 - op.target;
-    if (op.gate === 'CNOT') op.control = 1 - op.control;
+    if (op.gate === 'CNOT') [op.target, op.control] = [op.control, op.target];
+    else op.target = (op.target + 1) % circuit.initial.length;
   } else return;
   commit(circuit);
 });
@@ -392,7 +410,8 @@ document.addEventListener('pointermove', event => {
   slot.classList.add('drop-target', gateClass(drag.gate));
   const preview = document.createElement('div');
   preview.className = 'drop-preview';
-  preview.innerHTML = `${drag.gate === 'CNOT' ? '<i class="control-link"></i>' : ''}${draft().circuit.initial.map((_, q) => `<div class="preview-slot">${q === target ? `<span class="preview-gate">${gateSymbol(drag!.gate)}</span>` : drag!.gate === 'CNOT' ? '<span class="control-dot"></span>' : ''}</div>`).join('')}`;
+  const operation = placedOperation(drag.gate, target, drag.source);
+  preview.innerHTML = `${operation.gate === 'CNOT' ? controlLink(operation.control, target) : ''}${draft().circuit.initial.map((_, q) => `<div class="preview-slot">${q === target ? `<span class="preview-gate">${gateSymbol(operation.gate)}</span>` : operation.gate === 'CNOT' && q === operation.control ? '<span class="control-dot"></span>' : ''}</div>`).join('')}`;
   slot.append(preview);
 }, { passive: false });
 

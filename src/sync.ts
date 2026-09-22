@@ -1,4 +1,4 @@
-import { CHANNEL_NAME, EPSILON, SNAPSHOT_KEY } from './config.ts';
+import { CHANNEL_NAME, EPSILON, RUN_REQUEST_KEY, SNAPSHOT_KEY } from './config.ts';
 import { isValidCircuit } from './quantum.ts';
 import type { PublishedSnapshot } from './types.ts';
 
@@ -50,9 +50,11 @@ export function nextRevision(previous = 0): number {
 export function createSync(
   onSnapshot: (snapshot: PublishedSnapshot) => void,
   onRequest?: () => void,
-): { publish(snapshot: PublishedSnapshot): void; request(): void; close(): void } {
+  onRun?: () => void,
+): { publish(snapshot: PublishedSnapshot): void; request(): void; run(): void; close(): void } {
   let channel: BroadcastChannel | null = null;
   let latestReceived = -1;
+  const handledRuns = new Set<string>();
   try { channel = new BroadcastChannel(CHANNEL_NAME); } catch { /* Storage events still work. */ }
 
   const receive = (value: unknown) => {
@@ -60,13 +62,22 @@ export function createSync(
     latestReceived = value.revision;
     onSnapshot(value);
   };
+  const receiveRun = (id: unknown) => {
+    if (!onRun || typeof id !== 'string' || handledRuns.has(id)) return;
+    // Both transports may deliver the same click, including for an empty circuit.
+    handledRuns.add(id);
+    if (handledRuns.size > 32) handledRuns.delete(handledRuns.values().next().value!);
+    onRun();
+  };
   if (channel) channel.onmessage = (event: MessageEvent<unknown>) => {
     if (!isRecord(event.data)) return;
     if (event.data.type === 'request') onRequest?.();
+    else if (event.data.type === 'run') receiveRun(event.data.id);
     else if (event.data.type === 'snapshot') receive(event.data.snapshot);
   };
   const onStorage = (event: StorageEvent) => {
     if (event.key === SNAPSHOT_KEY) receive(parseSnapshot(event.newValue));
+    else if (event.key === RUN_REQUEST_KEY) receiveRun(event.newValue);
   };
   window.addEventListener('storage', onStorage);
 
@@ -78,6 +89,12 @@ export function createSync(
       channel?.postMessage({ type: 'snapshot', snapshot });
     },
     request() { channel?.postMessage({ type: 'request' }); },
+    run() {
+      const id = crypto.randomUUID();
+      // Commands are delivered live only; a stored click is never replayed on startup.
+      try { localStorage.setItem(RUN_REQUEST_KEY, id); } catch { /* The channel can still deliver. */ }
+      channel?.postMessage({ type: 'run', id });
+    },
     close() {
       window.removeEventListener('storage', onStorage);
       channel?.close();

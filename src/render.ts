@@ -13,13 +13,17 @@ const gateColors: Record<string, string> = {
 /** One column is one operation; q0 is always the top wire and the leftmost bit. */
 export function circuitSvg(circuit: Circuit, step = -1): string {
   const count = circuit.operations.length;
+  const qubits = circuit.initial.length;
   const width = Math.max(650, 190 + count * 96);
-  const height = circuit.initial.length === 1 ? 106 : 172;
-  const wireY = (qubit: number) => 66 + qubit * 68;
+  // Three wires use smaller gaps so gates remain readable on a 720p display.
+  const wireStart = qubits === 3 ? 52 : 66;
+  const wireSpacing = qubits === 3 ? 58 : 68;
+  const height = qubits === 1 ? 106 : wireStart + (qubits - 1) * wireSpacing + 38;
+  const wireY = (qubit: number) => wireStart + qubit * wireSpacing;
   const gateX = (index: number) => 155 + index * 96;
   const last = step - 1;
   const highlight = last >= 0 && last < count
-    ? `<rect x="${gateX(last) - 35}" y="18" width="70" height="${height - 24}" rx="12" fill="#e8eff8" />` : '';
+    ? `<rect x="${gateX(last) - 35}" y="${wireStart - 48}" width="70" height="${height - wireStart + 42}" rx="12" fill="#e8eff8" />` : '';
   const wires = circuit.initial.map((initial, qubit) => `<g>
     <text x="12" y="${wireY(qubit) + 6}" fill="#6e7477" font-size="15">q${qubit}</text>
     <text x="54" y="${wireY(qubit) + 7}" fill="#24354b" font-size="23">|${initial}⟩</text>
@@ -38,7 +42,7 @@ export function circuitSvg(circuit: Circuit, step = -1): string {
          <path d="M ${x - 12} ${y} H ${x + 12} M ${x} ${y - 12} V ${y + 12}" stroke="${color}" stroke-width="3" />`
       : `<rect x="${x - 24}" y="${y - 24}" width="48" height="48" rx="9" fill="${pending ? '#fbfbfa' : color}" stroke="${color}" stroke-width="1.5" />
          <text x="${x}" y="${y + 8}" text-anchor="middle" font-size="25" font-weight="600" fill="${pending ? color : 'white'}">${operation.gate}</text>`;
-    return `<g><title>${label}</title><text x="${x}" y="29" text-anchor="middle" fill="#6e7477" font-size="12">${index + 1}</text>${symbol}</g>`;
+    return `<g><title>${label}</title><text x="${x}" y="${wireStart - 37}" text-anchor="middle" fill="#6e7477" font-size="12">${index + 1}</text>${symbol}</g>`;
   }).join('');
   const empty = count === 0 ? `<text x="${width / 2 + 35}" y="${wireY(0) - 15}" text-anchor="middle" fill="#7b858c" font-size="16">Initial state · no gates yet</text>` : '';
   const description = circuit.operations.map(operation => operation.gate === 'CNOT' ? `CNOT from q${operation.control} to q${operation.target}` : `${operation.gate} on q${operation.target}`).join(', then ');
@@ -55,6 +59,7 @@ export function blochSvg(state: State, qubit: number): string {
   ];
   const point = project(x, y, z);
   const length = Math.hypot(x, y, z);
+  const mixed = state.length > 2 && length < 1 - 1e-8;
   const fixed = (value: number) => Math.abs(value) < 0.0005 ? '0' : value.toFixed(2).replace(/\.00$/, '');
   const axis = (a: number, b: number, c: number, label: string) => {
     const end = project(a * 1.18, b * 1.18, c * 1.18);
@@ -66,7 +71,7 @@ export function blochSvg(state: State, qubit: number): string {
     ? `<circle cx="${cx}" cy="${cy}" r="7" fill="#0c4f9b" /><circle cx="${cx}" cy="${cy}" r="13" fill="none" stroke="#0c4f9b" stroke-opacity=".16" stroke-width="6" />`
     : `<line x1="${cx}" y1="${cy}" x2="${point[0]}" y2="${point[1]}" stroke="#0c4f9b" stroke-width="3.5" stroke-linecap="round" />
        <circle cx="${point[0]}" cy="${point[1]}" r="6" fill="#0c4f9b" stroke="white" stroke-width="2" />`;
-  return `<svg class="bloch-sphere" viewBox="0 0 300 285" role="img" aria-label="Qubit ${qubit} Bloch vector: x ${fixed(x)}, y ${fixed(y)}, z ${fixed(z)}${length < 1e-8 ? ', at the center' : ''}" xmlns="http://www.w3.org/2000/svg">
+  return `<svg class="bloch-sphere" viewBox="${state.length === 8 ? '30 0 240 285' : '0 0 300 285'}" role="img" aria-label="Qubit ${qubit} Bloch vector: x ${fixed(x)}, y ${fixed(y)}, z ${fixed(z)}${length < 1e-8 ? ', at the center' : ''}${mixed ? ', entangled with other qubits' : ', pure local state'}" xmlns="http://www.w3.org/2000/svg">
     <circle cx="${cx}" cy="${cy}" r="${radius}" fill="#f0f4f8" fill-opacity=".65" stroke="#b9c8d5" stroke-width="1.3" />
     <ellipse cx="${cx}" cy="${cy}" rx="${radius}" ry="${radius * 0.3420201433}" fill="none" stroke="#bdcbd8" stroke-width="1.1" />
     <ellipse cx="${cx}" cy="${cy}" rx="${radius * .36}" ry="${radius}" fill="none" stroke="#d6dfe6" stroke-width="1" />
@@ -88,6 +93,10 @@ export function probabilityMarkup(state: State): string {
     return `<tr><th scope="row"><span class="ket">|${index.toString(2).padStart(qubits, '0')}⟩</span></th>
       <td class="probability-cell"><span class="probability-value">${text}<span class="percent">%</span></span><span class="probability-track" aria-hidden="true"><span style="width:${percent}%"></span></span></td>
       <td class="amplitude${percent < 1e-8 ? ' is-zero' : ''}">${escapeHtml(formatAmplitude(readable[index]))}</td></tr>`;
-  }).join('');
-  return `<table class="probability-table"><caption class="visually-hidden">Exact measurement probabilities and amplitudes. The state has not been measured.</caption><thead><tr><th scope="col">Outcome</th><th scope="col">Chance</th><th scope="col">Amplitude</th></tr></thead><tbody>${rows}</tbody></table>`;
+  });
+  const table = (tableRows: string[], range = '') => `<table class="probability-table"><caption class="visually-hidden">Exact measurement probabilities and amplitudes${range}. The state has not been measured.</caption><thead><tr><th scope="col">Outcome</th><th scope="col">Chance</th><th scope="col">Amplitude</th></tr></thead><tbody>${tableRows.join('')}</tbody></table>`;
+  // Eight outcomes stay fully visible without doubling the projector's table height.
+  return qubits === 3
+    ? `<div class="probability-tables">${table(rows.slice(0, 4), ' for outcomes 000 through 011')}${table(rows.slice(4), ' for outcomes 100 through 111')}</div>`
+    : table(rows);
 }
