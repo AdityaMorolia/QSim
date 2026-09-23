@@ -1,5 +1,5 @@
 import { CHANNEL_NAME, EPSILON, RUN_REQUEST_KEY, SNAPSHOT_KEY } from './config.ts';
-import { isValidCircuit } from './quantum.ts';
+import { circuitColumns, isValidCircuit } from './quantum.ts';
 import type { PublishedSnapshot } from './types.ts';
 
 function isRecord(value: unknown): value is Record<string, unknown> {
@@ -7,16 +7,17 @@ function isRecord(value: unknown): value is Record<string, unknown> {
 }
 
 export function isValidSnapshot(value: unknown): value is PublishedSnapshot {
-  if (!isRecord(value) || value.version !== 1 ||
+  if (!isRecord(value) || value.version !== 2 ||
       !Number.isSafeInteger(value.revision) || (value.revision as number) < 0) return false;
   if ('welcome' in value) return value.welcome === true;
   if (!isValidCircuit(value.circuit)) return false;
   if (!['runId', 'puzzleId', 'title', 'goal'].every(key => typeof value[key] === 'string')) return false;
   if (typeof value.example !== 'boolean' || ![0, 1].includes(value.variant as number)) return false;
+  const orders = circuitColumns(value.circuit).length;
   if (!Number.isInteger(value.step) || (value.step as number) < 0 ||
-      (value.step as number) > value.circuit.operations.length) return false;
+      (value.step as number) > orders) return false;
   if (!['playing', 'paused', 'complete'].includes(value.status as string)) return false;
-  if (value.status === 'complete' && value.step !== value.circuit.operations.length) return false;
+  if (value.status === 'complete' && value.step !== orders) return false;
   if (!Array.isArray(value.state) || value.state.length !== 2 ** value.circuit.initial.length) return false;
   let norm = 0;
   for (const amplitude of value.state) {

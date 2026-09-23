@@ -1,6 +1,6 @@
 import assert from 'node:assert/strict';
 import { test } from 'node:test';
-import { applyGate, blochVector, canonicalState, circuitSignature, fidelity, formatAmplitude, initialState, isValidCircuit, probabilities, simulate, targetFeedback } from '../src/quantum.ts';
+import { applyGate, blochVector, canonicalState, circuitColumns, circuitSignature, fidelity, formatAmplitude, initialState, isValidCircuit, probabilities, simulate, targetFeedback } from '../src/quantum.ts';
 import { PUZZLES, getPuzzle } from '../src/puzzles.ts';
 import type { Circuit, SingleGate, State } from '../src/types.ts';
 
@@ -22,6 +22,38 @@ test('single-qubit matrices, identities, and P phase convention', () => {
   const one = applyGate(zero, { gate: 'X', target: 0 });
   sameState(applyGate(one, { gate: 'Y', target: 0 }), [{ re: 0, im: -1 }, { re: 0, im: 0 }]);
   sameState(applyGate(one, { gate: 'P', target: 0 }), [{ re: 0, im: 0 }, { re: 0, im: 1 }]);
+});
+
+test('independent gates share one simulation order', () => {
+  const circuit: Circuit = { initial: ['0', '0'], operations: [{ gate: 'H', target: 0 }, { gate: 'H', target: 1 }] };
+  assert.deepEqual(circuitColumns(circuit), [[0, 1]]);
+  const frames = simulate(circuit);
+  assert.equal(frames.length, 2);
+  sameState(frames[1], Array.from({ length: 4 }, () => ({ re: 0.5, im: 0 })));
+});
+
+test('shared targets and controls keep conflicting gates in separate orders', () => {
+  const sameWire: Circuit = { initial: ['+'], operations: [{ gate: 'H', target: 0 }, { gate: 'X', target: 0 }] };
+  const frames = simulate(sameWire);
+  assert.deepEqual(circuitColumns(sameWire), [[0], [1]]);
+  assert.equal(frames.length, 3);
+  sameState(frames[1], [{ re: 1, im: 0 }, { re: 0, im: 0 }]);
+  sameState(frames[2], [{ re: 0, im: 0 }, { re: 1, im: 0 }]);
+  const conflicts: Circuit['operations'][] = [
+    [{ gate: 'CNOT', control: 0, target: 1 }, { gate: 'H', target: 0 }],
+    [{ gate: 'CNOT', control: 0, target: 1 }, { gate: 'X', target: 1 }],
+    [{ gate: 'CNOT', control: 0, target: 1 }, { gate: 'CNOT', control: 1, target: 2 }],
+  ];
+  for (const operations of conflicts) assert.deepEqual(circuitColumns({ initial: ['0', '0', '0'], operations }), [[0], [1]]);
+});
+
+test('CNOT and an independent third wire share one order with the correct joint state', () => {
+  const circuit: Circuit = { initial: ['+', '0', '0'], operations: [{ gate: 'CNOT', control: 0, target: 1 }, { gate: 'H', target: 2 }] };
+  assert.deepEqual(circuitColumns(circuit), [[0, 1]]);
+  const frames = simulate(circuit);
+  assert.equal(frames.length, 2);
+  sameState(frames[1], Array.from({ length: 8 }, (_, index) => ({ re: [0, 1, 6, 7].includes(index) ? 0.5 : 0, im: 0 })));
+  sameState(final({ ...circuit, operations: [...circuit.operations].reverse() }), frames[1]);
 });
 
 test('all target examples solve their puzzle, including two different ways', () => {
@@ -147,17 +179,25 @@ test('representative frames stay normalized without mutating their inputs', () =
 });
 
 test('circuit validation rejects unsupported sizes, gates, and wire references', () => {
-  for (const invalid of [null, {}, { initial: [], operations: [] }, { initial: ['0', '0', '0', '0'], operations: [] }, { initial: ['1'], operations: [] }, { initial: ['0'], operations: Array(9).fill({ gate: 'H', target: 0 }) }, ...[
+  for (const invalid of [null, {}, { initial: [], operations: [] }, { initial: ['0', '0', '0', '0'], operations: [] }, { initial: ['1'], operations: [] }, ...[
     { gate: 'H', target: 1 }, { gate: 'H', target: -1 }, { gate: 'H', target: 0.5 }, { gate: 'T', target: 0 }, { gate: 'toString', target: 0 }, { gate: 'CNOT', control: 0, target: 0 }, { gate: 'CNOT', control: 1, target: 0 },
   ].map(operation => ({ initial: ['0'], operations: [operation] }))]) assert.equal(isValidCircuit(invalid), false);
   assert.equal(isValidCircuit({ initial: ['0', '+'], operations: [{ gate: 'CNOT', control: 1, target: 0 }] }), true);
   assert.equal(isValidCircuit({ initial: ['0', '0', '+'], operations: [{ gate: 'CNOT', control: 2, target: 0 }] }), true);
   assert.equal(isValidCircuit({ initial: ['0', '0', '0'], operations: [{ gate: 'H', target: 3 }] }), false);
   assert.equal(isValidCircuit({ initial: ['0', '0', '0'], operations: [{ gate: 'CNOT', control: 3, target: 0 }] }), false);
-  assert.equal(isValidCircuit({ initial: ['0'], operations: Array(8).fill({ gate: 'H', target: 0 }) }), true);
+  assert.equal(isValidCircuit({ initial: ['0'], operations: Array(9).fill({ gate: 'H', target: 0 }) }), true);
   for (const length of [3, 16]) {
     const invalidState = Array.from({ length }, () => ({ re: 0, im: 0 }));
     assert.throws(() => applyGate(invalidState, { gate: 'H', target: 0 }));
     assert.throws(() => blochVector(invalidState, 0));
   }
+});
+
+test('long circuits validate and simulate every gate without truncation', () => {
+  const circuit: Circuit = { initial: ['0'], operations: Array.from({ length: 129 }, () => ({ gate: 'X', target: 0 })) };
+  assert.equal(isValidCircuit(circuit), true);
+  const frames = simulate(circuit);
+  assert.equal(frames.length, 130);
+  sameState(frames.at(-1)!, [{ re: 0, im: 0 }, { re: 1, im: 0 }]);
 });

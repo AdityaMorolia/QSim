@@ -1,5 +1,5 @@
 import type { Circuit, State } from './types.ts';
-import { blochVector, canonicalState, formatAmplitude, probabilities } from './quantum.ts';
+import { circuitColumns, blochVector, canonicalState, formatAmplitude, probabilities } from './quantum.ts';
 
 export function escapeHtml(value: string): string {
   return value.replace(/[&<>"']/g, character => ({ '&': '&amp;', '<': '&lt;', '>': '&gt;', '"': '&quot;', "'": '&#39;' })[character]!);
@@ -10,30 +10,37 @@ const gateColors: Record<string, string> = {
   Z: 'var(--gate-z, #8053ab)', P: 'var(--gate-p, #8053ab)', CNOT: 'var(--gate-cnot, #008b85)',
 };
 
-/** One column is one operation; q0 is always the top wire and the leftmost bit. */
+/** q0 is always the top wire and the leftmost bit. */
 export function circuitSvg(circuit: Circuit, step = -1): string {
   const count = circuit.operations.length;
   const qubits = circuit.initial.length;
-  const width = Math.max(650, 190 + count * 96);
+  const columns = circuitColumns(circuit);
+  const width = Math.max(650, 190 + columns.length * 96);
   // Three wires use smaller gaps so gates remain readable on a 720p display.
   const wireStart = qubits === 3 ? 52 : 66;
   const wireSpacing = qubits === 3 ? 58 : 68;
   const height = qubits === 1 ? 106 : wireStart + (qubits - 1) * wireSpacing + 38;
   const wireY = (qubit: number) => wireStart + qubit * wireSpacing;
-  const gateX = (index: number) => 155 + index * 96;
+  const gateX = (column: number) => 155 + column * 96;
   const last = step - 1;
-  const highlight = last >= 0 && last < count
-    ? `<rect x="${gateX(last) - 35}" y="${wireStart - 48}" width="70" height="${height - wireStart + 42}" rx="12" fill="#e8eff8" />` : '';
+  const appliedWires = (columns[last] ?? []).flatMap(index => {
+    const op = circuit.operations[index];
+    return op.gate === 'CNOT' ? [op.target, op.control] : [op.target];
+  });
+  const firstWire = Math.min(...appliedWires), lastWire = Math.max(...appliedWires);
+  const highlight = appliedWires.length
+    ? `<rect x="${gateX(last) - 35}" y="${wireY(firstWire) - 28}" width="70" height="${(lastWire - firstWire) * wireSpacing + 56}" rx="12" fill="#e8eff8" />` : '';
   const wires = circuit.initial.map((initial, qubit) => `<g>
     <text x="12" y="${wireY(qubit) + 6}" fill="#6e7477" font-size="15">q${qubit}</text>
     <text x="54" y="${wireY(qubit) + 7}" fill="#24354b" font-size="23">|${initial}⟩</text>
     <line x1="105" y1="${wireY(qubit)}" x2="${width - 20}" y2="${wireY(qubit)}" stroke="#cbd3dc" stroke-width="2" />
   </g>`).join('');
-  const gates = circuit.operations.map((operation, index) => {
-    const x = gateX(index);
+  const gates = columns.map((indices, column) => `<g data-order="${column + 1}">${[...indices].sort((a, b) => Number(circuit.operations[b].gate === 'CNOT') - Number(circuit.operations[a].gate === 'CNOT')).map(index => {
+    const operation = circuit.operations[index];
+    const x = gateX(column);
     const y = wireY(operation.target);
     const color = gateColors[operation.gate];
-    const pending = step >= 0 && index >= step;
+    const pending = step >= 0 && column >= step;
     const label = operation.gate === 'CNOT' ? `CNOT, q${operation.control} controls q${operation.target}` : `${operation.gate} on q${operation.target}`;
     const symbol = operation.gate === 'CNOT'
       ? `<line x1="${x}" y1="${wireY(operation.control)}" x2="${x}" y2="${y}" stroke="${color}" stroke-width="3" />
@@ -42,11 +49,11 @@ export function circuitSvg(circuit: Circuit, step = -1): string {
          <path d="M ${x - 12} ${y} H ${x + 12} M ${x} ${y - 12} V ${y + 12}" stroke="${color}" stroke-width="3" />`
       : `<rect x="${x - 24}" y="${y - 24}" width="48" height="48" rx="9" fill="${pending ? '#fbfbfa' : color}" stroke="${color}" stroke-width="1.5" />
          <text x="${x}" y="${y + 8}" text-anchor="middle" font-size="25" font-weight="600" fill="${pending ? color : 'white'}">${operation.gate}</text>`;
-    return `<g><title>${label}</title><text x="${x}" y="${wireStart - 37}" text-anchor="middle" fill="#6e7477" font-size="12">${index + 1}</text>${symbol}</g>`;
-  }).join('');
+    return `<g><title>${label}</title>${symbol}</g>`;
+  }).join('')}</g>`).join('');
   const empty = count === 0 ? `<text x="${width / 2 + 35}" y="${wireY(0) - 15}" text-anchor="middle" fill="#7b858c" font-size="16">Initial state · no gates yet</text>` : '';
-  const description = circuit.operations.map(operation => operation.gate === 'CNOT' ? `CNOT from q${operation.control} to q${operation.target}` : `${operation.gate} on q${operation.target}`).join(', then ');
-  return `<svg class="circuit-diagram" viewBox="0 0 ${width} ${height}" role="img" aria-label="${circuit.initial.length}-qubit circuit with ${count} gates${step >= 0 ? `, ${step} applied` : ''}${description ? `. ${description}.` : ''}" xmlns="http://www.w3.org/2000/svg" style="display:block;width:100%;font-family:inherit">${highlight}${wires}${gates}${empty}</svg>`;
+  const description = columns.map(indices => indices.map(index => { const operation = circuit.operations[index]; return operation.gate === 'CNOT' ? `CNOT from q${operation.control} to q${operation.target}` : `${operation.gate} on q${operation.target}`; }).join(' and ')).join(', then ');
+  return `<svg class="circuit-diagram" viewBox="0 0 ${width} ${height}" role="img" aria-label="${circuit.initial.length}-qubit circuit with ${count} gates${description ? `. ${description}.` : ''}" xmlns="http://www.w3.org/2000/svg" style="--circuit-width:${width}px;display:block;width:100%;font-family:inherit">${highlight}${wires}${gates}${empty}</svg>`;
 }
 
 /** Fixed orthographic camera; never normalize a reduced state to the sphere's surface. */

@@ -1,4 +1,4 @@
-import { EPSILON, MAX_GATES, MAX_QUBITS } from './config.ts';
+import { EPSILON, MAX_QUBITS } from './config.ts';
 import type { Circuit, Complex, Feedback, Operation, SingleGate, State } from './types.ts';
 
 const c = (re: number, im = 0): Complex => ({ re, im });
@@ -34,12 +34,12 @@ export function isValidCircuit(value: unknown): value is Circuit {
   const circuit = value as Partial<Circuit>;
   return Array.isArray(circuit.initial) && circuit.initial.length >= 1 && circuit.initial.length <= MAX_QUBITS
     && circuit.initial.every(value => value === '0' || value === '+')
-    && Array.isArray(circuit.operations) && circuit.operations.length <= MAX_GATES
+    && Array.isArray(circuit.operations)
     && circuit.operations.every(operation => isOperation(operation, circuit.initial!.length));
 }
 
 export function initialState(circuit: Circuit): State {
-  if (!isValidCircuit(circuit)) throw new Error(`Use one to ${MAX_QUBITS} qubits and at most ${MAX_GATES} valid gates.`);
+  if (!isValidCircuit(circuit)) throw new Error(`Use one to ${MAX_QUBITS} qubits and valid gates.`);
   let state: State = [c(1)];
   for (const initial of circuit.initial) {
     const factor = initial === '+' ? SQRT_HALF : 1;
@@ -74,9 +74,26 @@ export function applyGate(state: State, operation: Operation): State {
   return next;
 }
 
+/** Disjoint gates commute and share an order; conflicts start the next order. */
+export function circuitColumns(circuit: Circuit): number[][] {
+  const columns: number[][] = [];
+  let occupied = 0;
+  circuit.operations.forEach((operation, index) => {
+    const wires = (1 << operation.target) | (operation.gate === 'CNOT' ? 1 << operation.control : 0);
+    if (!columns.length || (occupied & wires)) { columns.push([]); occupied = 0; }
+    columns.at(-1)!.push(index);
+    occupied |= wires;
+  });
+  return columns;
+}
+
 export function simulate(circuit: Circuit): State[] {
   const frames = [initialState(circuit)];
-  for (const operation of circuit.operations) frames.push(applyGate(frames[frames.length - 1], operation));
+  for (const column of circuitColumns(circuit)) {
+    let state = frames[frames.length - 1];
+    for (const index of column) state = applyGate(state, circuit.operations[index]);
+    frames.push(state);
+  }
   return frames;
 }
 

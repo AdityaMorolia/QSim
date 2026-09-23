@@ -24,7 +24,7 @@ export interface Puzzle {
 export interface Feedback { tone: 'success' | 'info' | 'retry'; text: string }
 export type RunStatus = 'playing' | 'paused' | 'complete';
 export interface DisplaySnapshot {
-  version: 1;
+  version: 2;
   revision: number;
   runId: string;
   puzzleId: string;
@@ -39,5 +39,5 @@ export interface DisplaySnapshot {
   feedback: Feedback | null;
 }
 export interface Run extends DisplaySnapshot { frames: State[] }
-export interface WelcomeSnapshot { version: 1; revision: number; welcome: true }
+export interface WelcomeSnapshot { version: 2; revision: number; welcome: true }
 export type PublishedSnapshot = DisplaySnapshot | WelcomeSnapshot;

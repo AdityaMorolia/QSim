@@ -1,5 +1,4 @@
-// Booth settings live here so timing and circuit size are easy to change.
-export const MAX_GATES = 8;
+// Booth settings live here so timing and qubit count are easy to change.
 export const MAX_QUBITS = 3;
 export const STEP_MS = 650;
 export const EPSILON = 1e-8;

@@ -1,7 +1,7 @@
 import './shared.css';
 import './display.css';
 import type { PublishedSnapshot } from './types.ts';
-import { blochVector } from './quantum.ts';
+import { blochVector, circuitColumns } from './quantum.ts';
 import { blochSvg, circuitSvg, escapeHtml, probabilityMarkup } from './render.ts';
 import { createSync, readSnapshot } from './sync.ts';
 
@@ -11,7 +11,7 @@ app.innerHTML = `<main id="display-content"></main>`;
 const content = document.querySelector<HTMLElement>('#display-content')!;
 let revision = -1;
 
-const brand = (running = false) => `<div class="display-brand"><span class="brand-orbit" aria-hidden="true">✳</span><span>Quantum Playground</span><span class="brand-divider">/</span><span class="display-edition">Live experiment</span><button class="display-run" data-run aria-disabled="${running}">Run</button></div>`;
+const brand = (running = false, meta = '') => `<div class="display-brand"><span class="brand-orbit" aria-hidden="true">✳</span><span>Quantum Playground</span><span class="brand-divider">/</span><span class="display-edition">Live experiment</span>${meta}<button class="display-run" data-run aria-disabled="${running}">Run</button></div>`;
 
 function show(markup: string, className: string): void {
   const refocusRun = document.activeElement?.matches('[data-run]');
@@ -38,14 +38,16 @@ function render(snapshot: PublishedSnapshot): void {
     const vector = blochVector(state, index);
     return Math.hypot(vector.x, vector.y, vector.z) < 1 - 1e-8;
   });
-  const complete = step === circuit.operations.length;
+  const complete = step === circuitColumns(circuit).length;
   const feedback = complete ? snapshot.feedback : null;
-  show(`${brand(status === 'playing')}
-    <header class="experiment-heading"><div><h1>${escapeHtml(snapshot.title)}</h1><p>${escapeHtml(snapshot.goal)}</p></div><div class="run-meta">${snapshot.example ? '<span class="example-tag">Example</span>' : ''}<span class="step-counter">Step <strong>${step}</strong><span> / ${circuit.operations.length}</span></span><span class="playback-state"><span class="status-dot ${status}"></span>${status === 'playing' ? 'Running' : status === 'paused' ? 'Paused' : 'Complete'}</span></div></header>
+  show(`${brand(status === 'playing', `<div class="run-meta">${snapshot.example ? '<span class="example-tag">Example</span>' : ''}<span class="playback-state"><span class="status-dot ${status}"></span>${status === 'playing' ? 'Running' : status === 'paused' ? 'Paused' : 'Complete'}</span></div>`)}
     <section class="display-circuit" aria-label="Launched circuit">${circuitSvg(circuit, step)}</section>
     <div class="state-panels"><section class="measurement-panel"><div class="panel-heading"><span class="section-index">01</span><h2>If measured now</h2></div>${probabilityMarkup(state)}<p class="panel-caption">Exact chances. No measurement has been taken.</p></section>
     <section class="bloch-panel"><div class="panel-heading"><span class="section-index">02</span><h2>${qubits === 1 ? 'A view of the state' : 'Each qubit on its own'}</h2></div><div class="sphere-grid">${circuit.initial.map((_, index) => `<div class="sphere-cell"><div class="sphere-label">q${index}<span>${qubits === 1 ? 'Bloch sphere' : index === 0 ? 'Top wire' : index === qubits - 1 ? 'Bottom wire' : 'Middle wire'}</span></div>${blochSvg(state, index)}</div>`).join('')}</div><p class="panel-caption bloch-caption">${entangled ? 'Shorter vectors indicate entanglement with other qubits.' : 'The direction reveals changes you can’t see in the chances.'}</p></section></div>
-    <footer class="display-feedback ${feedback ? feedback.tone : 'neutral'}" aria-live="polite"><span class="feedback-dot" aria-hidden="true"></span><span class="feedback-message">${feedback ? escapeHtml(feedback.text) : complete ? 'Experiment complete. What will you try next?' : 'Follow the highlighted gate.'}</span>${entangled ? '<span class="state-note">Shared quantum state</span>' : ''}</footer>`, `experiment-screen qubits-${qubits}`);
+    <footer class="display-feedback ${feedback ? feedback.tone : 'neutral'}" aria-live="polite"><span class="feedback-dot" aria-hidden="true"></span><span class="feedback-message">${feedback ? escapeHtml(feedback.text) : complete ? 'Experiment complete. What will you try next?' : 'Follow the highlighted gates.'}</span>${entangled ? '<span class="state-note">Shared quantum state</span>' : ''}</footer>`, `experiment-screen qubits-${qubits}`);
+  const track = content.querySelector<HTMLElement>('.display-circuit')!;
+  const order = track.querySelector(`[data-order="${step}"]`);
+  if (order) track.scrollLeft = Math.max(0, order.getBoundingClientRect().left - track.getBoundingClientRect().left - track.clientWidth / 2);
 }
 
 welcome();
