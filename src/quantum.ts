@@ -20,13 +20,20 @@ function add(a: Complex, b: Complex): Complex {
   return c(a.re + b.re, a.im + b.im);
 }
 
+export function controlWires(operation: Operation): number[] {
+  return operation.gate === 'CNOT' ? [operation.control] : operation.controls ?? [];
+}
+
 function isOperation(value: unknown, qubits: number): value is Operation {
   if (!value || typeof value !== 'object') return false;
   const op = value as Record<string, unknown>;
   const isWire = (wire: unknown) => typeof wire === 'number' && Number.isInteger(wire) && wire >= 0 && wire < qubits;
   if (!isWire(op.target)) return false;
   if (op.gate === 'CNOT') return isWire(op.control) && op.control !== op.target;
-  return typeof op.gate === 'string' && Object.hasOwn(matrices, op.gate);
+  return typeof op.gate === 'string' && Object.hasOwn(matrices, op.gate)
+    && (op.controls === undefined || (Array.isArray(op.controls) && op.controls.length <= 2
+      && new Set(op.controls).size === op.controls.length
+      && [...op.controls].every(control => isWire(control) && control !== op.target)));
 }
 
 export function isValidCircuit(value: unknown): value is Circuit {
@@ -54,18 +61,10 @@ export function applyGate(state: State, operation: Operation): State {
   const next = state.map(a => ({ ...a }));
   // q0 is the top wire and most significant (leftmost) bit: 000, 001, …, 111.
   const targetMask = 1 << (qubits - 1 - operation.target);
-  if (operation.gate === 'CNOT') {
-    const controlMask = 1 << (qubits - 1 - operation.control);
-    for (let index = 0; index < state.length; index++) {
-      if ((index & controlMask) && !(index & targetMask)) {
-        [next[index], next[index | targetMask]] = [next[index | targetMask], next[index]];
-      }
-    }
-    return next;
-  }
-  const [a, b, d, e] = matrices[operation.gate];
+  const controlMask = controlWires(operation).reduce((mask, control) => mask | (1 << (qubits - 1 - control)), 0);
+  const [a, b, d, e] = matrices[operation.gate === 'CNOT' ? 'X' : operation.gate];
   for (let index = 0; index < state.length; index++) {
-    if (index & targetMask) continue;
+    if ((index & targetMask) || (index & controlMask) !== controlMask) continue;
     const zero = state[index];
     const one = state[index | targetMask];
     next[index] = add(multiply(a, zero), multiply(b, one));
@@ -79,7 +78,7 @@ export function circuitColumns(circuit: Circuit): number[][] {
   const columns: number[][] = [];
   let occupied = 0;
   circuit.operations.forEach((operation, index) => {
-    const wires = (1 << operation.target) | (operation.gate === 'CNOT' ? 1 << operation.control : 0);
+    const wires = controlWires(operation).reduce((mask, control) => mask | (1 << control), 1 << operation.target);
     if (!columns.length || (occupied & wires)) { columns.push([]); occupied = 0; }
     columns.at(-1)!.push(index);
     occupied |= wires;
@@ -151,7 +150,10 @@ export function formatAmplitude(value: Complex): string {
 
 export function circuitSignature(circuit: Circuit): string {
   // Puzzle 3 compares written gate sequences, not equivalence after simplification.
-  return circuit.operations.map(op => op.gate === 'CNOT' ? `CNOT:${op.control}>${op.target}` : `${op.gate}:${op.target}`).join('|');
+  return circuit.operations.map(op => {
+    const controls = [...controlWires(op)].sort((a, b) => a - b);
+    return `${op.gate}:${controls.length ? `${controls.join(',')}>` : ''}${op.target}`;
+  }).join('|');
 }
 
 export function targetFeedback(actual: State, target: State): Feedback {

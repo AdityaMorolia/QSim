@@ -2,7 +2,7 @@ import assert from 'node:assert/strict';
 import { test } from 'node:test';
 import { applyGate, blochVector, canonicalState, circuitColumns, circuitSignature, fidelity, formatAmplitude, initialState, isValidCircuit, probabilities, simulate, targetFeedback } from '../src/quantum.ts';
 import { PUZZLES, getPuzzle } from '../src/puzzles.ts';
-import type { Circuit, SingleGate, State } from '../src/types.ts';
+import type { Circuit, Operation, SingleGate, State } from '../src/types.ts';
 
 const close = (actual: number, expected: number) => assert.ok(Math.abs(actual - expected) < 1e-10, `${actual} ≠ ${expected}`);
 const sameState = (actual: State, expected: State) => {
@@ -200,4 +200,124 @@ test('long circuits validate and simulate every gate without truncation', () => 
   const frames = simulate(circuit);
   assert.equal(frames.length, 130);
   sameState(frames.at(-1)!, [{ re: 0, im: 0 }, { re: 1, im: 0 }]);
+});
+
+test('every controlled matrix requires all controls to be one in every wire placement', () => {
+  for (const qubits of [2, 3]) for (let target = 0; target < qubits; target++) {
+    const otherWires = Array.from({ length: qubits }, (_, wire) => wire).filter(wire => wire !== target);
+    const controlSets = otherWires.map(wire => [wire]);
+    if (qubits === 3) controlSets.push(otherWires);
+    for (const controls of controlSets) {
+      for (const gate of ['H', 'X', 'Y', 'Z', 'P'] as SingleGate[]) for (let basis = 0; basis < 2 ** qubits; basis++) {
+        const bits = basis.toString(2).padStart(qubits, '0').split('');
+        const input = Array.from({ length: 2 ** qubits }, (_, index) => ({ re: Number(index === basis), im: 0 }));
+        const expected = input.map(() => ({ re: 0, im: 0 }));
+        const targetOne = bits[target] === '1';
+        if (controls.some(control => bits[control] === '0')) expected[basis].re = 1;
+        else {
+          bits[target] = targetOne ? '0' : '1';
+          const flipped = Number.parseInt(bits.join(''), 2);
+          if (gate === 'H') {
+            expected[basis].re = targetOne ? -Math.SQRT1_2 : Math.SQRT1_2;
+            expected[flipped].re = Math.SQRT1_2;
+          } else if (gate === 'X') expected[flipped].re = 1;
+          else if (gate === 'Y') expected[flipped].im = targetOne ? -1 : 1;
+          else if (gate === 'Z') expected[basis].re = targetOne ? -1 : 1;
+          else expected[basis] = targetOne ? { re: 0, im: 1 } : { re: 1, im: 0 };
+        }
+        sameState(applyGate(input, { gate, controls, target }), expected);
+      }
+    }
+  }
+});
+
+test('controlled gates preserve relative and global phases across superposed control branches', () => {
+  const input = initialState({ initial: ['+', '+'], operations: [] });
+  const half = { re: 0.5, im: 0 }, zeroAmplitude = { re: 0, im: 0 };
+  const expected: Record<SingleGate, State> = {
+    H: [half, half, { re: Math.SQRT1_2, im: 0 }, zeroAmplitude],
+    X: [half, half, half, half],
+    Y: [half, half, { re: 0, im: -0.5 }, { re: 0, im: 0.5 }],
+    Z: [half, half, half, { re: -0.5, im: 0 }],
+    P: [half, half, half, { re: 0, im: 0.5 }],
+  };
+  const rotate = (state: State) => state.map(({ re, im }) => ({ re: -im, im: re }));
+  for (const gate of Object.keys(expected) as SingleGate[]) {
+    const original = structuredClone(input);
+    const result = applyGate(input, { gate, controls: [0], target: 1 });
+    sameState(result, expected[gate]);
+    sameState(applyGate(rotate(input), { gate, controls: [0], target: 1 }), rotate(expected[gate]));
+    close(probabilities(result).reduce((sum, p) => sum + p, 0), 1);
+    assert.deepEqual(input, original);
+  }
+});
+
+test('controlled X and CNOT agree on complex states in every wire direction', () => {
+  for (const qubits of [2, 3]) {
+    const raw = Array.from({ length: 2 ** qubits }, (_, index) => ({ re: index + 1, im: 2 - index }));
+    const norm = Math.sqrt(raw.reduce((sum, a) => sum + a.re ** 2 + a.im ** 2, 0));
+    const state = raw.map(({ re, im }) => ({ re: re / norm, im: im / norm }));
+    for (let control = 0; control < qubits; control++) for (let target = 0; target < qubits; target++) {
+      if (target === control) continue;
+      sameState(applyGate(state, { gate: 'X', controls: [control], target }), applyGate(state, { gate: 'CNOT', control, target }));
+    }
+  }
+});
+
+test('CCX, CCP and CCH preserve coherence between active and inactive control branches', () => {
+  const toffoli = final({ initial: ['+', '+', '0'], operations: [{ gate: 'X', controls: [0, 1], target: 2 }] });
+  sameState(toffoli, Array.from({ length: 8 }, (_, index) => ({ re: [0, 2, 4, 7].includes(index) ? 0.5 : 0, im: 0 })));
+  const input = initialState({ initial: ['+', '+', '+'], operations: [] });
+  const amplitude = 1 / Math.sqrt(8);
+  const phaseExpected = Array.from({ length: 8 }, (_, index) => index === 7 ? { re: 0, im: amplitude } : { re: amplitude, im: 0 });
+  sameState(applyGate(input, { gate: 'P', controls: [0, 1], target: 2 }), phaseExpected);
+  const hadamardExpected = Array.from({ length: 8 }, (_, index) => ({ re: index < 6 ? amplitude : index === 6 ? 0.5 : 0, im: 0 }));
+  sameState(applyGate(input, { gate: 'H', controls: [0, 1], target: 2 }), hadamardExpected);
+  const rotate = (state: State) => state.map(({ re, im }) => ({ re: -im, im: re }));
+  sameState(applyGate(rotate(input), { gate: 'P', controls: [1, 0], target: 2 }), rotate(phaseExpected));
+  sameState(applyGate(rotate(input), { gate: 'H', controls: [1, 0], target: 2 }), rotate(hadamardExpected));
+});
+
+test('control lists require distinct valid wires and CNOT still requires its legacy control', () => {
+  const state = initialState({ initial: ['0', '0', '0'], operations: [] });
+  for (const gate of ['H', 'X', 'Y', 'Z', 'P']) {
+    for (const controls of [null, 1, {}, [null], Array(1), [-1], [0], [0.5], [3], [NaN], [Infinity], ['1'], [true], [1, 1], [1, 2, 0]]) {
+      const operation = { gate, target: 0, controls };
+      assert.equal(isValidCircuit({ initial: ['0', '0', '0'], operations: [operation] }), false);
+      assert.throws(() => applyGate(state, operation as Operation));
+    }
+    for (const controls of [[], [1], [2], [1, 2], [2, 1]]) {
+      assert.equal(isValidCircuit({ initial: ['0', '0', '0'], operations: [{ gate, target: 0, controls }] }), true);
+    }
+    assert.equal(isValidCircuit({ initial: ['0'], operations: [{ gate, target: 0 }] }), true);
+    assert.equal(isValidCircuit({ initial: ['0'], operations: [{ gate, target: 0, controls: [0] }] }), false);
+  }
+  for (const control of [undefined, null, -1, 0, 0.5, 3, NaN, Infinity, '1', true]) {
+    const operation = { gate: 'CNOT', target: 0, control };
+    assert.equal(isValidCircuit({ initial: ['0', '0', '0'], operations: [operation] }), false);
+    assert.throws(() => applyGate(state, operation as Operation));
+  }
+  assert.equal(isValidCircuit({ initial: ['0', '0'], operations: [{ gate: 'CNOT', target: 1 }] }), false);
+});
+
+test('grouping and circuit signatures include every control wire', () => {
+  for (const gate of ['H', 'X', 'Y', 'Z', 'P'] as SingleGate[]) {
+    const controlled: Operation = { gate, controls: [0], target: 2 };
+    const circuit: Circuit = { initial: ['+', '0', '+'], operations: [controlled, { gate: 'H', target: 1 }] };
+    assert.deepEqual(circuitColumns(circuit), [[0, 1]]);
+    sameState(simulate(circuit).at(-1)!, applyGate(applyGate(initialState(circuit), controlled), { gate: 'H', target: 1 }));
+    for (const conflict of [{ gate: 'H', target: 0 }, { gate: 'H', target: 2 }, { gate: 'P', controls: [0], target: 1 }] as Operation[]) {
+      assert.deepEqual(circuitColumns({ ...circuit, operations: [controlled, conflict] }), [[0], [1]]);
+    }
+    const signature = (operation: Operation) => circuitSignature({ ...circuit, operations: [operation] });
+    assert.notEqual(signature(controlled), signature({ gate, target: 2 }));
+    assert.notEqual(signature(controlled), signature({ gate, controls: [1], target: 2 }));
+    assert.notEqual(signature(controlled), signature({ gate, controls: [2], target: 0 }));
+    const doublyControlled: Operation = { gate, controls: [0, 1], target: 2 };
+    for (const target of [0, 1, 2]) {
+      assert.deepEqual(circuitColumns({ ...circuit, operations: [doublyControlled, { gate: 'H', target }] }), [[0], [1]]);
+    }
+    assert.notEqual(signature(controlled), signature(doublyControlled));
+    assert.equal(signature(doublyControlled), signature({ gate, controls: [1, 0], target: 2 }));
+  }
 });

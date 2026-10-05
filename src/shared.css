@@ -6,7 +6,13 @@
   text-rendering: optimizeLegibility;
   -webkit-font-smoothing: antialiased;
   --border: #d8dcde;
-  --blue: #0c4f9b;
+  --brand-turquoise: #0087c9;
+  --brand-blue: #21409a;
+  --brand-gradient: linear-gradient(110deg, var(--brand-turquoise), var(--brand-blue));
+  --brand-soft-gradient: linear-gradient(110deg, #0087c914, #21409a14);
+  --brand-tint: #edf5fb;
+  --brand-border: #c7daec;
+  --blue: var(--brand-blue);
   --gate-h: #0c4f9b;
   --gate-x: #c34b3e;
   --gate-y: #c34b3e;
@@ -20,8 +26,18 @@ button, a, summary { -webkit-tap-highlight-color: transparent; }
 button { font: inherit; color: inherit; cursor: pointer; border: 1px solid var(--border); background: white; border-radius: 7px; min-height: 44px; padding: 10px 15px; transition: background .15s, border-color .15s, box-shadow .15s; }
 button:hover:not(:disabled) { background: #f0f3f6; border-color: #9caab6; }
 button:disabled { opacity: .4; cursor: not-allowed; }
-button:focus-visible, a:focus-visible, summary:focus-visible { outline: 3px solid #70a0f1; outline-offset: 4px; }
+button:focus-visible, a:focus-visible, summary:focus-visible { outline: 3px solid var(--brand-turquoise); outline-offset: 4px; }
 button svg { vertical-align: middle; }
 button, summary { touch-action: manipulation; }
 a { color: var(--blue); }
 h1, h2, h3, p { margin-top: 0; }
+.brand-logo { display: block; width: 240px; max-width: 100%; height: auto; }
+.display-feedback { border-top: 1px solid #dce2e7; min-height: 33px; padding-top: 14px; display: flex; gap: 10px; align-items: center; font-size: 22px; font-weight: 500; }
+.feedback-message { min-width: 0; flex: 1; overflow-wrap: break-word; }
+.feedback-dot { width: 9px; height: 9px; border-radius: 50%; background: var(--brand-gradient); flex-shrink: 0; }
+.display-feedback.success { color: #007f75; }
+.display-feedback.success .feedback-dot { background: #008b85; }
+.display-feedback.retry { color: #916232; }
+.display-feedback.retry .feedback-dot { background: #c69b62; }
+.display-feedback.neutral { color: #617184; font-weight: 400; }
+.display-feedback.neutral .feedback-dot { background: #a5b0bb; }

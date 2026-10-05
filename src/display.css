@@ -7,22 +7,22 @@
 }
 .display-page #app { min-height: 100dvh; }
 .display-page .visually-hidden { position: absolute; width: 1px; height: 1px; padding: 0; margin: -1px; overflow: hidden; clip: rect(0, 0, 0, 0); white-space: nowrap; border: 0; }
-.display-brand { display: flex; align-items: center; gap: 15px; min-height: 36px; color: #344a63; font-size: 16px; font-weight: 650; letter-spacing: .13em; text-transform: uppercase; }
-.brand-orbit { color: var(--blue); font-size: 36px; line-height: 1; }
-.brand-divider { color: #cad0d7; font-size: 23px; font-weight: 400; margin: 0 3px; }
-.display-edition { color: #667688; font-weight: 500; }
-.display-run { margin-left: auto; flex-shrink: 0; min-width: 100px; font-size: 20px; font-weight: 600; letter-spacing: normal; text-transform: none; color: white; background: var(--blue); border-color: var(--blue); }
-button.display-run:hover { background: #004088; border-color: #004088; }
+.display-brand { display: flex; align-items: center; gap: 15px; min-height: 36px; padding: 10px 18px; border-radius: 12px; color: white; background: var(--brand-gradient); font-size: 16px; font-weight: 650; letter-spacing: .13em; text-transform: uppercase; }
+.display-brand .brand-logo { width: 220px; flex-shrink: 0; object-fit: contain; }
+.brand-divider { color: #ffffff70; font-size: 23px; font-weight: 400; margin: 0 3px; }
+.display-edition { color: #ffffffe0; font-weight: 500; }
+.display-run { margin-left: auto; flex-shrink: 0; min-width: 100px; font-size: 20px; font-weight: 600; letter-spacing: normal; text-transform: none; color: var(--brand-blue); background: white; border-color: white; }
+button.display-run:hover { background: var(--brand-tint); border-color: var(--brand-tint); }
 .display-run[aria-disabled="true"] { opacity: .4; cursor: default; }
 .experiment-screen { box-sizing: border-box; width: 100%; min-height: 100dvh; padding: 18px 32px 16px; display: grid; grid-template-rows: auto auto 1fr auto; gap: 12px; }
 .run-meta { display: flex; align-items: center; gap: 12px; white-space: nowrap; margin-left: auto; text-transform: none; letter-spacing: normal; font-weight: 400; }
 .run-meta + .display-run { margin-left: 0; }
-.playback-state { font-size: 16px; color: #617184; display: flex; align-items: center; gap: 7px; }
-.status-dot { width: 8px; height: 8px; border-radius: 50%; background: #939eaa; }
-.status-dot.playing { background: #0c4f9b; }
+.playback-state { font-size: 16px; color: white; display: flex; align-items: center; gap: 7px; }
+.status-dot { width: 8px; height: 8px; border-radius: 50%; background: #ffffff80; }
+.status-dot.playing { background: white; }
 .status-dot.complete { background: #008b85; }
-.example-tag { text-transform: uppercase; font-size: 13px; font-weight: 700; letter-spacing: .1em; border: 1px solid #d6c7e5; color: #8053ab; border-radius: 4px; padding: 3px 7px; }
-.display-circuit { min-width: 0; overflow-x: auto; background-color: #f5f7f9; background-image: radial-gradient(#cbd4de70 .75px, transparent .75px); background-size: 13px 13px; border: 1px solid #e0e5e9; border-radius: 12px; padding: 4px 18px; }
+.example-tag { text-transform: uppercase; font-size: 13px; font-weight: 700; letter-spacing: .1em; border: 1px solid #ffffff80; color: white; border-radius: 4px; padding: 3px 7px; }
+.display-circuit { min-width: 0; overflow-x: auto; background-color: var(--brand-tint); background-image: radial-gradient(#21409a25 .75px, transparent .75px); background-size: 13px 13px; border: 1px solid var(--brand-border); border-radius: 12px; padding: 4px 18px; }
 .display-circuit .circuit-diagram { min-width: calc(var(--circuit-width) * 1.2); height: 140px; }
 .qubits-2 .display-circuit .circuit-diagram { height: 180px; }
 .qubits-3 .display-circuit .circuit-diagram { height: 205px; }
@@ -30,7 +30,6 @@ button.display-run:hover { background: #004088; border-color: #004088; }
 .measurement-panel, .bloch-panel { min-width: 0; }
 .bloch-panel { border-left: 1px solid #e0e5e9; padding-left: 26px; }
 .panel-heading { display: flex; align-items: center; gap: 10px; }
-.section-index { font: 15px ui-monospace, monospace; color: #617184; border: 1px solid #dce2e8; padding: 4px; border-radius: 4px; }
 .panel-heading h2 { margin: 0; font-size: 27px; font-weight: 550; line-height: 1.25; letter-spacing: -.025em; }
 .probability-table { width: 100%; border-collapse: collapse; table-layout: fixed; margin-top: 15px; }
 .probability-table thead th { text-align: left; font-size: 16px; color: #617184; font-weight: 500; padding: 0 0 10px; }
@@ -43,16 +42,16 @@ button.display-run:hover { background: #004088; border-color: #004088; }
 .probability-cell { padding-right: 20px !important; }
 .probability-value { display: block; font-size: 32px; font-weight: 550; font-variant-numeric: tabular-nums; line-height: 1.1; }
 .percent { font-size: 20px; color: #617184; font-weight: 400; margin-left: 3px; }
-.probability-track { display: block; height: 6px; background: #e5eaf0; border-radius: 3px; margin-top: 7px; width: 100%; overflow: hidden; }
-.probability-track > span { display: block; height: 100%; background: #0c4f9b; border-radius: inherit; }
-.probability-table td.amplitude { font-family: ui-monospace, 'SFMono-Regular', Consolas, monospace; text-align: right; font-size: 29px; color: #8053ab; letter-spacing: -.045em; }
+.probability-track { display: block; height: 6px; background: var(--brand-border); border-radius: 3px; margin-top: 7px; width: 100%; overflow: hidden; }
+.probability-track > span { display: block; height: 100%; background: var(--brand-gradient); border-radius: inherit; }
+.probability-table td.amplitude { font-family: ui-monospace, 'SFMono-Regular', Consolas, monospace; text-align: right; font-size: 29px; color: var(--brand-blue); letter-spacing: -.045em; }
 .probability-table td.amplitude.is-zero { color: #778493; }
 .panel-caption { font-size: 15px; color: #617184; margin: 10px 0 0; line-height: 1.4; }
 .sphere-grid { display: grid; grid-template-columns: 1fr; margin-top: 12px; }
 .qubits-2 .sphere-grid { grid-template-columns: 1fr 1fr; gap: 7px; }
 .qubits-3 .sphere-grid { grid-template-columns: repeat(3, minmax(0, 1fr)); gap: 6px; }
 .sphere-cell { min-width: 0; text-align: center; }
-.sphere-label { display: flex; justify-content: center; gap: 10px; align-items: center; font: 19px ui-monospace, monospace; color: #0c4f9b; }
+.sphere-label { display: flex; justify-content: center; gap: 10px; align-items: center; font: 19px ui-monospace, monospace; color: var(--brand-blue); }
 .sphere-label span { font: 14px system-ui, sans-serif; color: #617184; letter-spacing: .01em; }
 .bloch-sphere { display: block; width: 100%; max-width: 380px; height: 280px; margin: 0 auto; overflow: visible; }
 .qubits-2 .bloch-sphere { height: 250px; }
@@ -72,25 +71,21 @@ button.display-run:hover { background: #004088; border-color: #004088; }
 .probability-tables .probability-cell { padding-right: 10px !important; }
 .probability-tables .probability-table td.amplitude { font-size: 22px; overflow-wrap: anywhere; }
 .bloch-caption { text-align: center; margin-top: 5px; }
-.display-feedback { border-top: 1px solid #dce2e7; min-height: 33px; padding-top: 14px; display: flex; gap: 10px; align-items: center; font-size: 22px; font-weight: 500; }
-.feedback-message { min-width: 0; flex: 1; overflow-wrap: break-word; }
-.feedback-dot { width: 9px; height: 9px; border-radius: 50%; background: #0c4f9b; flex-shrink: 0; }
-.display-feedback.success { color: #007f75; }
-.display-feedback.success .feedback-dot { background: #008b85; }
-.display-feedback.retry { color: #916232; }
-.display-feedback.retry .feedback-dot { background: #c69b62; }
-.display-feedback.neutral { color: #617184; font-weight: 400; }
-.display-feedback.neutral .feedback-dot { background: #a5b0bb; }
 .state-note { margin-left: auto; font-size: 14px; color: #617184; font-weight: 400; white-space: nowrap; }
-.welcome-screen { min-height: 100dvh; box-sizing: border-box; padding: 33px 54px 27px; display: flex; flex-direction: column; overflow: hidden; }
+.welcome-screen { min-height: 100dvh; box-sizing: border-box; padding: 18px 32px 16px; display: flex; flex-direction: column; gap: 12px; overflow: hidden; }
 .welcome-body { flex: 1; display: grid; grid-template-columns: 1.1fr 1fr; align-items: center; max-width: 1450px; width: 100%; margin: 0 auto; }
 .welcome-copy { padding-left: 10px; position: relative; z-index: 1; }
-.welcome-kicker { display: flex; align-items: center; gap: 11px; font-size: 17px; color: #718193; letter-spacing: .13em; text-transform: uppercase; }
-.welcome-kicker span { width: 7px; height: 7px; border-radius: 50%; background: #008b85; }
 .welcome-gates { display: block; width: min(100%, 420px); margin-top: 28px; }
 .welcome-art { width: 110%; margin-left: -7%; max-height: 64vh; }
+.default-body { display: contents; }
+.demo-screen .state-panels, .demo-screen .demo-status { animation: demo-reveal .25s ease-out; }
+.demo-screen .circuit-diagram > rect { animation: demo-highlight .6s ease-out; }
+.demo-screen .demo-status { min-height: 64px; font-size: clamp(28px, 3vw, 46px); color: var(--brand-blue); }
+@keyframes demo-reveal { from { opacity: .35; } to { opacity: 1; } }
+@keyframes demo-highlight { from { fill: var(--brand-turquoise); } to { fill: var(--brand-border); } }
+@media (prefers-reduced-motion: reduce) { .demo-screen * { animation: none !important; transition: none !important; } }
 @media (min-width: 1500px) and (min-height: 950px) {
-  .experiment-screen { padding: 24px 40px 20px; gap: 16px; }
+  .experiment-screen, .welcome-screen { padding: 24px 40px 20px; gap: 16px; }
   .display-brand { font-size: 19px; }
   .display-run { font-size: 23px; }
   .playback-state { font-size: 19px; }
@@ -118,12 +113,14 @@ button.display-run:hover { background: #004088; border-color: #004088; }
 }
 @media (max-height: 900px) and (min-width: 900px) {
   /* Use tighter spacing on shorter displays so the larger content has room. */
-  .experiment-screen { padding: 12px 26px; gap: 6px; }
+  .experiment-screen, .welcome-screen { padding: 12px 26px; gap: 6px; }
+  .display-brand { padding: 7px 16px; }
+  .display-brand .brand-logo { width: 180px; }
   .state-panels { padding-top: 0; }
   .sphere-grid, .probability-table { margin-top: 8px; }
   .panel-caption { margin-top: 5px; }
   .display-circuit .circuit-diagram { height: 125px; }
-  .bloch-sphere { height: 250px; }
+  .bloch-sphere { height: 225px; }
   .qubits-2 .display-circuit .circuit-diagram { height: 155px; }
   .qubits-3 .display-circuit .circuit-diagram { height: 185px; }
   .qubits-2 .bloch-sphere { height: 225px; }
@@ -133,10 +130,13 @@ button.display-run:hover { background: #004088; border-color: #004088; }
   .qubits-2 .probability-value { font-size: 29px; }
   .qubits-2 .probability-table .ket { font-size: 32px; }
   .display-feedback { min-height: 26px; padding-top: 8px; font-size: 20px; }
+  .demo-screen .demo-status { min-height: 44px; font-size: 30px; line-height: 1.1; }
+  .demo-screen .bloch-sphere { height: 215px; }
 }
 @media (max-width: 899px) {
   .experiment-screen { padding: 20px; display: flex; flex-direction: column; gap: 20px; }
   .display-brand { flex-wrap: wrap; font-size: 10px; gap: 8px; }
+  .display-brand .brand-logo { width: 180px; }
   .display-edition, .brand-divider { display: none; }
   .run-meta { gap: 4px; }
   .display-circuit { overflow-x: auto; padding: 5px; }
@@ -147,12 +147,16 @@ button.display-run:hover { background: #004088; border-color: #004088; }
   .bloch-sphere, .qubits-2 .bloch-sphere { height: 240px; }
   .display-feedback { font-size: 15px; }
   .state-note { display: none; }
-  .welcome-screen { padding: 25px; }
+  .welcome-screen { padding: 20px; gap: 20px; }
   .welcome-body { grid-template-columns: 1fr; }
   .welcome-copy { padding: 40px 0 0; }
   .welcome-art { max-height: 38vh; width: 100%; margin: 0; }
 }
 @media (max-width: 560px) {
+  .display-brand { padding: 10px 12px; }
+  .display-brand .brand-logo { width: 160px; }
+  .run-meta { order: 3; width: 100%; justify-content: flex-end; }
+  .run-meta + .display-run { margin-left: auto; }
   .probability-tables { grid-template-columns: 1fr; gap: 14px; }
   .qubits-3 .sphere-grid { grid-template-columns: 1fr; gap: 24px; }
   .qubits-3 .bloch-sphere { height: 240px; }

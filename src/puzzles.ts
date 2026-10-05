@@ -70,5 +70,5 @@ export function getPuzzle(id: string): Puzzle {
 }
 
 export function cloneCircuit(circuit: Circuit): Circuit {
-  return { initial: [...circuit.initial], operations: circuit.operations.map(operation => ({ ...operation })) };
+  return structuredClone(circuit);
 }

@@ -1,7 +1,7 @@
 export type SingleGate = 'H' | 'X' | 'Y' | 'Z' | 'P';
 export type GateKind = SingleGate | 'CNOT';
 export type Operation =
-  | { gate: SingleGate; target: number }
+  | { gate: SingleGate; target: number; controls?: number[] }
   | { gate: 'CNOT'; target: number; control: number };
 export interface Complex { re: number; im: number }
 export type State = Complex[];
