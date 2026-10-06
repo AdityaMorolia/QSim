@@ -54,4 +54,4 @@ The compact numerical checks use Node's built-in test runner. There is no browse
 - Open/refresh the monitor during a run; refresh the builder during playback; confirm paused restoration and draft preservation.
 - Click **Reset** and verify that both windows reset.
 
-Puzzle content follows *Quantum Puzzles.pdf* and the *Bubble Computer and QC cheat sheet.pdf* supplied for this project. Palette and lightweight setup are inspired by [math-viz](https://github.com/AdityaMorolia/math-viz). Bubble Computer, puzzles 7–10, random sampling, custom gates, and circuits larger than three qubits are outside this version.
+Palette and lightweight setup are inspired by [math-viz](https://github.com/AdityaMorolia/math-viz). 
