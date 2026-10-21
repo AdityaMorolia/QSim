@@ -1,8 +1,9 @@
-import type { Circuit, GateKind, Puzzle, State } from './types.ts';
+import type { Circuit, Example, GateKind, Puzzle, State } from './types.ts';
 
 const state = (...values: number[]): State => values.map(re => ({ re, im: 0 }));
 const h = Math.SQRT1_2;
 const empty = (): Circuit => ({ initial: ['0'], operations: [] });
+const markedStates = ['11', '00', '01', '10'];
 
 export const GATES: { gate: GateKind; name: string; description: string }[] = [
   { gate: 'H', name: 'Hadamard', description: 'Mix the |0⟩ and |1⟩ amplitudes.' },
@@ -57,6 +58,42 @@ export const PUZZLES: Puzzle[] = [
     starter: { initial: ['0', '0'], operations: [] }, target: state(0, h, h, 0),
     hint: 'Use H on the top wire, then CNOT with the top wire as control. Flip one qubit to make the pair opposite.',
     examples: [{ label: 'Mix, link, flip', explanation: 'H on q0 and CNOT from q0 to q1 make (|00⟩ + |11⟩)/√2. X on q1 changes it to (|01⟩ + |10⟩)/√2.', circuit: { initial: ['0', '0'], operations: [{ gate: 'H', target: 0 }, { gate: 'CNOT', control: 0, target: 1 }, { gate: 'X', target: 1 }] } }],
+  },
+  {
+    id: '7', number: 7, title: 'Quantum for classical', shortTitle: 'Quantum for classical', kind: 'target',
+    prompt: 'Write a AND b into the last qubit. Start at |110⟩; your circuit must also work for |000⟩, |010⟩ and |100⟩.', goal: '|ab0⟩ → |ab(a AND b)⟩', concept: 'Build a quantum AND',
+    starter: { initial: ['1', '1', '0'], operations: [] }, mapping: [[0, 0], [2, 2], [4, 4], [6, 7]],
+    hint: 'Choose Control twice, placing one on q0 and one on q1. Which gate should they control on q2?',
+    examples: [{ label: 'Two controls, one flip', explanation: 'X on q2, controlled by both q0 and q1, flips the last bit only when both input bits are 1.', circuit: { initial: ['1', '1', '0'], operations: [{ gate: 'X', controls: [0, 1], target: 2 }] } }],
+  },
+  {
+    id: '8', number: 8, title: 'All things equal', shortTitle: 'All things equal', kind: 'target',
+    prompt: 'Make all four outcomes equally likely, with matching signs.', goal: '(|00⟩ + |01⟩ + |10⟩ + |11⟩)/2', concept: 'Mix four possibilities',
+    starter: { initial: ['0', '0'], operations: [] }, target: state(0.5, 0.5, 0.5, 0.5),
+    hint: 'H mixes one qubit. What happens when you use it on both?',
+    examples: [{ label: 'A little H on each wire', explanation: 'H on each qubit makes |++⟩. Each of the four amplitudes is 1/2, so each outcome has probability 1/4.', circuit: { initial: ['0', '0'], operations: [{ gate: 'H', target: 0 }, { gate: 'H', target: 1 }] } }],
+  },
+  {
+    id: '9', number: 9, title: 'Baby Grover step', shortTitle: 'Baby Grover step', kind: 'target',
+    prompt: 'Build U to flip only the chosen amplitude’s sign. Run adds the fixed worksheet steps.', goal: '|11⟩', concept: 'Find a marked outcome',
+    starter: { initial: ['+', '+'], operations: [] },
+    variants: markedStates.map(bits => ({ goal: `|${bits}⟩`, target: state(...Array.from({ length: 4 }, (_, index) => Number(index === parseInt(bits, 2)))) })),
+    suffix: [{ gate: 'H', target: 0 }, { gate: 'H', target: 1 }, { gate: 'Z', target: 0 }, { gate: 'Z', target: 1 }, { gate: 'Z', controls: [0], target: 1 }, { gate: 'H', target: 0 }, { gate: 'H', target: 1 }],
+    hint: 'A controlled Z changes only the sign of |11⟩. To mark another outcome, try X gates before and after it. Run follows your gates with H on both qubits, Z on both, controlled Z, then H on both.',
+    examples: markedStates.map((bits): Example => {
+      const flips = [...bits].flatMap((bit, target) => bit === '0' ? [{ gate: 'X' as const, target }] : []);
+      return {
+        label: `Mark |${bits}⟩`, explanation: `${flips.length ? 'X gates move the chosen outcome to |11⟩ and back around a controlled Z.' : 'A controlled Z flips only the |11⟩ amplitude.'} The fixed worksheet steps then produce |${bits}⟩.`,
+        circuit: { initial: ['+', '+'], operations: [...flips, { gate: 'Z', controls: [0], target: 1 }, ...flips] },
+      };
+    }),
+  },
+  {
+    id: '10', number: 10, title: 'Swapper no swapping', shortTitle: 'Swapper no swapping', kind: 'target',
+    prompt: 'Swap the two qubits using gates you already know. Your circuit must work for every input.', goal: '|a⟩|b⟩ → |b⟩|a⟩', concept: 'Exchange two qubits',
+    starter: { initial: ['+', '0'], operations: [] }, mapping: [[0, 0], [1, 2], [2, 1], [3, 3]],
+    hint: 'Try three CNOT gates, alternating which wire controls the other.',
+    examples: [{ label: 'Three linked flips', explanation: 'CNOT from q0 to q1, then q1 to q0, then q0 to q1 swaps the qubits, including their amplitudes and phases.', circuit: { initial: ['+', '0'], operations: [{ gate: 'CNOT', control: 0, target: 1 }, { gate: 'CNOT', control: 1, target: 0 }, { gate: 'CNOT', control: 0, target: 1 }] } }],
   },
   {
     id: 'free', number: 0, title: 'Free play', shortTitle: 'Free play', kind: 'free',

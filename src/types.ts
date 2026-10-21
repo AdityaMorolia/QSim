@@ -5,7 +5,7 @@ export type Operation =
   | { gate: 'CNOT'; target: number; control: number };
 export interface Complex { re: number; im: number }
 export type State = Complex[];
-export interface Circuit { initial: ('0' | '+')[]; operations: Operation[] }
+export interface Circuit { initial: ('0' | '1' | '+')[]; operations: Operation[] }
 export interface Example { label: string; explanation: string; circuit: Circuit }
 export interface Puzzle {
   id: string;
@@ -17,6 +17,9 @@ export interface Puzzle {
   concept: string;
   starter: Circuit;
   target?: State;
+  mapping?: [input: number, output: number][];
+  variants?: { goal: string; target: State }[];
+  suffix?: Operation[];
   kind: 'target' | 'two-ways' | 'compare' | 'free';
   hint: string;
   examples: Example[];

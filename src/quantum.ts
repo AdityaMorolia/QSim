@@ -40,7 +40,7 @@ export function isValidCircuit(value: unknown): value is Circuit {
   if (!value || typeof value !== 'object') return false;
   const circuit = value as Partial<Circuit>;
   return Array.isArray(circuit.initial) && circuit.initial.length >= 1 && circuit.initial.length <= MAX_QUBITS
-    && circuit.initial.every(value => value === '0' || value === '+')
+    && circuit.initial.every(value => value === '0' || value === '1' || value === '+')
     && Array.isArray(circuit.operations)
     && circuit.operations.every(operation => isOperation(operation, circuit.initial!.length));
 }
@@ -50,7 +50,7 @@ export function initialState(circuit: Circuit): State {
   let state: State = [c(1)];
   for (const initial of circuit.initial) {
     const factor = initial === '+' ? SQRT_HALF : 1;
-    state = state.flatMap(a => [c(a.re * factor, a.im * factor), initial === '+' ? c(a.re * factor, a.im * factor) : c(0)]);
+    state = state.flatMap(a => [initial === '1' ? c(0) : c(a.re * factor, a.im * factor), initial === '0' ? c(0) : c(a.re * factor, a.im * factor)]);
   }
   return state;
 }
@@ -161,4 +161,18 @@ export function targetFeedback(actual: State, target: State): Feedback {
   const actualProbabilities = probabilities(actual);
   const sameChances = actual.length === target.length && probabilities(target).every((p, index) => Math.abs(p - actualProbabilities[index]) < EPSILON);
   return { tone: 'retry', text: sameChances ? 'The chances match. Check the signs and phases.' : 'Not quite—try another circuit.' };
+}
+
+export function mappingFeedback(circuit: Circuit, mapping: [input: number, output: number][]): Feedback {
+  let overlap = c(0);
+  for (const [input, output] of mapping) {
+    let state = Array.from({ length: 2 ** circuit.initial.length }, (_, index) => c(index === input ? 1 : 0));
+    for (const operation of circuit.operations) state = applyGate(state, operation);
+    overlap = add(overlap, state[output]);
+  }
+  // One common phase across all inputs is needed to preserve superpositions.
+  const score = (overlap.re ** 2 + overlap.im ** 2) / mapping.length ** 2;
+  return score >= 1 - EPSILON
+    ? { tone: 'success', text: 'All inputs work. Target reached!' }
+    : { tone: 'retry', text: 'Not quite—your circuit must work for every input, preserving relative phases.' };
 }

@@ -1,9 +1,9 @@
 import './style.css';
 import brandLogo from '../assets/NQCH LOGO_Singapore_gradient_reverse.png';
 import { MAX_QUBITS, STEP_MS, SESSION_KEY } from './config.ts';
-import type { Circuit, Feedback, GateKind, Operation, Run } from './types.ts';
+import type { Circuit, Feedback, GateKind, Operation, Puzzle, Run } from './types.ts';
 import { PUZZLES, GATES, getPuzzle, cloneCircuit } from './puzzles.ts';
-import { blochVector, circuitColumns, circuitSignature, controlWires, isValidCircuit, simulate, targetFeedback } from './quantum.ts';
+import { blochVector, circuitColumns, circuitSignature, controlWires, isValidCircuit, mappingFeedback, simulate, targetFeedback } from './quantum.ts';
 import { blochSvg, circuitSvg, escapeHtml, probabilityMarkup } from './render.ts';
 import { createSync, nextRevision, readSnapshot } from './sync.ts';
 
@@ -50,7 +50,7 @@ function loadVisitor(): Visitor {
     const value = JSON.parse(sessionStorage.getItem(SESSION_KEY) ?? 'null') as Visitor | null;
     if (!value || !PUZZLES.some(p => p.id === value.selected) || !value.drafts || !value.progress) return freshVisitor();
     for (const draft of Object.values(value.drafts)) {
-      if (!draft || !isValidCircuit(draft.circuit) || typeof draft.example !== 'boolean' || ![0, 1].includes(draft.variant)) return freshVisitor();
+      if (!draft || !isValidCircuit(draft.circuit) || typeof draft.example !== 'boolean' || !Number.isInteger(draft.variant)) return freshVisitor();
     }
     for (const progress of Object.values(value.progress)) {
       if (!progress || typeof progress.solved !== 'boolean' || !Array.isArray(progress.signatures) || !progress.signatures.every(s => typeof s === 'string') || !Array.isArray(progress.compared) || !progress.compared.every(v => v === 0 || v === 1)) return freshVisitor();
@@ -59,6 +59,8 @@ function loadVisitor(): Visitor {
     for (const puzzle of PUZZLES) {
       const saved = value.drafts[puzzle.id];
       if (!saved) continue;
+      const variants = puzzle.variants?.length ?? (puzzle.kind === 'compare' ? puzzle.examples.length : 1);
+      if (saved.variant < 0 || saved.variant >= variants) saved.variant = 0;
       if (puzzle.kind === 'compare') saved.circuit = cloneCircuit(puzzle.examples[saved.variant].circuit);
       else if (puzzle.kind !== 'free' && JSON.stringify(saved.circuit.initial) !== JSON.stringify(puzzle.starter.initial)) delete value.drafts[puzzle.id];
     }
@@ -74,6 +76,12 @@ function saveVisitor() {
 
 function draft(): Draft {
   return visitor.drafts[visitor.selected] ??= { circuit: cloneCircuit(getPuzzle(visitor.selected).starter), example: false, variant: 0 };
+}
+
+function launchCircuit(circuit: Circuit, puzzle: Puzzle): Circuit {
+  const full = cloneCircuit(circuit);
+  full.operations.push(...structuredClone(puzzle.suffix ?? []));
+  return full;
 }
 
 function progress(id = visitor.selected): Progress {
@@ -96,6 +104,7 @@ function render() {
   const puzzle = getPuzzle(visitor.selected);
   const current = locked() && run ? { circuit: run.circuit, example: run.example, variant: run.variant } : draft();
   const circuit = current.circuit;
+  const goal = puzzle.variants?.[current.variant]?.goal ?? puzzle.goal;
   const count = circuit.operations.length;
   const state = progress();
   const columns = circuitColumns(circuit);
@@ -103,7 +112,7 @@ function render() {
   const active = selectedIndex !== null ? circuit.operations[selectedIndex] : undefined;
   const controls = active ? controlWires(active) : [];
   const runningThis = run?.puzzleId === puzzle.id;
-  const changed = run && (run.puzzleId !== puzzle.id || JSON.stringify(run.circuit) !== JSON.stringify(circuit) || run.example !== current.example);
+  const changed = run && (run.puzzleId !== puzzle.id || JSON.stringify(run.circuit) !== JSON.stringify(locked() ? circuit : launchCircuit(circuit, puzzle)) || run.example !== current.example || run.variant !== current.variant);
   const results = resultsMarkup(!!changed);
   const status = locked() ? (run?.status === 'playing' ? 'Your circuit is running on the display' : 'Paused · explore your circuit') : changed ? 'Changes not launched' : '';
   const complete = run && run.step === run.frames.length - 1;
@@ -117,7 +126,7 @@ function render() {
     </header>
     <div class="builder-layout">
       <aside class="sidebar" aria-label="Choose an experiment">
-        <div class="sidebar-heading"><span class="eyebrow">YOUR EXPERIMENTS</span><span class="progress-count">${PUZZLES.filter(p => p.kind !== 'free' && progress(p.id).solved).length}/6</span></div>
+        <div class="sidebar-heading"><span class="eyebrow">YOUR EXPERIMENTS</span><span class="progress-count">${PUZZLES.filter(p => p.kind !== 'free' && progress(p.id).solved).length}/${PUZZLES.filter(p => p.kind !== 'free').length}</span></div>
         <nav class="puzzle-nav">${PUZZLES.map(p => `<button class="puzzle-link ${p.id === puzzle.id ? 'is-current' : ''} ${p.kind === 'free' ? 'free-link' : ''}" data-puzzle="${p.id}" ${p.id === puzzle.id ? 'aria-current="page"' : ''} ${disable(!!locked())}><span class="puzzle-number ${progress(p.id).solved ? 'is-solved' : ''}">${progress(p.id).solved ? '✓' : p.kind === 'free' ? '∞' : String(p.number).padStart(2, '0')}</span><span>${escapeHtml(p.shortTitle)}</span><span class="nav-arrow" aria-hidden="true">›</span></button>`).join('')}</nav>
         <section class="sidebar-help" aria-labelledby="help-heading"><h2 id="help-heading" class="eyebrow">HELP</h2><div class="help-links">${(Object.keys(helpTopics) as HelpTopic[]).map(topic => helpLinkMarkup(topic)).join('')}</div></section>
         <div class="sidebar-note"><p>A little curiosity goes a long way.</p></div>
@@ -130,6 +139,7 @@ function render() {
           ${puzzle.kind === 'compare' ? `<div class="comparison-options">${puzzle.examples.map((ex, i) => `<button data-variant="${i}" class="comparison-button ${current.variant === i ? 'is-active' : ''}" ${disable(!!locked())}><span class="small-label">CIRCUIT ${i === 0 ? 'A' : 'B'} ${state.compared.includes(i) ? '· COMPARED' : ''}</span>${escapeHtml(ex.label)}</button>`).join('')}</div>` : `<div class="gate-palette"><button class="palette-gate control-tool ${selectedGate === 'control' ? 'is-selected' : ''}" data-tool="control" aria-label="Control: choose a control wire for the next gate" aria-pressed="${selectedGate === 'control'}" ${disable(!!locked() || circuit.initial.length < 2)}><span class="gate-letter">●</span><span class="gate-name">Control</span></button>${GATES.filter(g => circuit.initial.length > 1 || g.gate !== 'CNOT').map(g => `<button class="palette-gate ${gateClass(g.gate)} ${selectedGate === g.gate ? 'is-selected' : ''}" data-gate="${g.gate}" aria-label="${g.gate}: ${escapeHtml(g.description)}" aria-pressed="${selectedGate === g.gate}" title="${escapeHtml(g.description)}" ${disable(!!locked())}><span class="gate-letter">${g.gate === 'CNOT' ? '⊕' : g.gate}</span><span class="gate-name">${g.gate === 'CNOT' ? 'CNOT' : escapeHtml(g.name)}</span></button>`).join('')}</div>${selectedGate || pendingControls.length ? `<div class="palette-note" role="status"><span class="small-label">${selectedGate === 'control' || pendingControls.length ? 'CONTROLLED GATE' : 'SELECTED GATE'}</span><span>${selectedGate === 'control' ? `Click or drag onto a control wire.${circuit.initial.length > 2 ? ' Repeat Control to add a second wire.' : ' Then place a gate on the other wire.'}` : pendingControls.length ? `Control${pendingControls.length > 1 ? 's' : ''}: ${pendingControls.map(q => `q${q}`).join(', ')}. Choose a gate and place it on another wire.` : escapeHtml(GATES.find(g => g.gate === selectedGate)!.description)}</span>${pendingControls.length ? '<button class="quiet-button" data-action="cancel-controls">Cancel controls</button>' : ''}</div>` : ''}`}
           </div><button class="launch-button" data-action="launch" ${disable(!!locked())}>Run <span aria-hidden="true">↗</span></button></div>
           ${puzzle.kind === 'free' ? `<div class="qubit-picker"><span>Start with</span>${Array.from({ length: MAX_QUBITS }, (_, index) => index + 1).map(n => `<button data-qubits="${n}" class="${circuit.initial.length === n ? 'is-active' : ''}" aria-pressed="${circuit.initial.length === n}" ${disable(!!locked())}>${n} qubit${n > 1 ? 's' : ''}</button>`).join('')}</div>` : ''}
+          ${puzzle.variants ? `<div class="qubit-picker"><span>Mark</span>${puzzle.variants.map((variant, i) => `<button data-variant="${i}" class="${current.variant === i ? 'is-active' : ''}" aria-pressed="${current.variant === i}" ${disable(!!locked())}>${escapeHtml(variant.goal)}</button>`).join('')}</div>` : ''}
           <div class="circuit-stage ${selectedGate ? 'has-tool' : ''}" aria-label="Circuit, left to right">${editorMarkup(circuit)}</div>
         </section>
         ${results.bloch}
@@ -137,7 +147,7 @@ function render() {
         <div class="experiment-workspace">
         <aside class="experiment-controls" aria-label="Experiment controls">
         <div class="workspace-heading"><div><h1>${escapeHtml(puzzle.title)}</h1>${puzzle.prompt ? `<p class="puzzle-prompt">${escapeHtml(puzzle.prompt)}</p>` : ''}</div><span class="concept-pill">${escapeHtml(puzzle.concept)}</span></div>
-        <div class="goal-strip"><span class="goal-icon" aria-hidden="true">◎</span><div><span class="small-label">${puzzle.kind === 'compare' ? 'THE QUESTION' : puzzle.kind === 'free' ? 'YOUR LAB' : 'YOUR MISSION'}</span><span class="goal-text">${escapeHtml(puzzle.goal)}</span></div>${puzzle.kind === 'two-ways' ? `<span class="ways-count">${Math.min(2, state.signatures.length)} / 2 ways</span>` : ''}</div>
+        <div class="goal-strip"><span class="goal-icon" aria-hidden="true">◎</span><div><span class="small-label">${puzzle.kind === 'compare' ? 'THE QUESTION' : puzzle.kind === 'free' ? 'YOUR LAB' : 'YOUR MISSION'}</span><span class="goal-text">${escapeHtml(goal)}</span></div>${puzzle.kind === 'two-ways' ? `<span class="ways-count">${Math.min(2, state.signatures.length)} / 2 ways</span>` : ''}</div>
           <div class="circuit-caption"><span>${puzzle.kind === 'compare' ? 'These circuits are ready to launch. Watch how their states differ.' : pendingControls.length ? 'Choose a gate and another wire. It will join the controls in their column.' : selectedGate === 'CNOT' ? (circuit.initial.length === 2 ? 'Place on the qubit to flip. The other wire becomes the control.' : 'Place on the qubit to flip, then choose its control wire below.') : count === 0 ? 'Your circuit starts here. Choose a gate, then click near a wire.' : 'Time moves left to right. Click a gate to edit it.'}</span><span class="flow-label">TIME <span aria-hidden="true">→</span></span></div>
           <div class="selection-tools" aria-label="Selected gate controls">${active && editable() ? `<span class="selection-label"><span class="selected-chip ${gateClass(active.gate)}">${active.gate}</span></span><button data-action="left" ${disable(activeColumn === 0)} aria-label="Move selected gate left">← Move</button><button data-action="right" ${disable(activeColumn === columns.length - 1)} aria-label="Move selected gate right">Move →</button>${circuit.initial.length > 1 && controls.length < 2 ? `<button data-action="switch">${controls.length ? 'Reverse direction' : 'Switch wire'}</button>` : ''}${controls.length === 1 && circuit.initial.length > 2 ? `<span class="control-label">Control:</span>${circuit.initial.map((_, q) => q === active.target ? '' : `<button class="control-choice" data-control="${q}" aria-pressed="${controls[0] === q}" aria-label="Use qubit ${q} as control">q${q}</button>`).join('')}` : ''}${controls.length ? '<button data-action="uncontrol">Remove controls</button>' : ''}<button class="delete-button" data-action="delete">Delete</button>` : `<span class="selection-placeholder">${puzzle.kind === 'compare' ? 'Same gates. Different order. What changes?' : 'No gate selected'}</span>`}</div>
           <div class="lab-footer"><div class="edit-actions"><button class="quiet-button" data-action="undo" ${disable(!editable() || !(undo[puzzle.id]?.length))}><span aria-hidden="true">↶</span> Undo</button><button class="quiet-button" data-action="reset" ${disable(!editable())}>Reset attempt</button><button class="quiet-button" data-action="replay" ${disable(!run)}><span aria-hidden="true">↺</span> Replay</button></div>${status ? `<div class="launch-group"><span class="draft-status"><span class="status-dot ${changed ? 'is-pending' : ''}"></span>${status}</span></div>` : ''}</div>
@@ -210,9 +220,11 @@ helpDialog.addEventListener('click', event => {
   if (button?.disabled) return;
   if (button?.hasAttribute('data-close-help')) { closeHelp(); return; }
   if (button?.dataset.example !== undefined && activeHelp?.puzzleId === visitor.selected && editable()) {
-    const example = getPuzzle(visitor.selected).examples[Number(button.dataset.example)];
+    const puzzle = getPuzzle(visitor.selected);
+    const index = Number(button.dataset.example);
+    const example = puzzle.examples[index];
     selectedIndex = null;
-    commit(cloneCircuit(example.circuit), true);
+    commit(cloneCircuit(example.circuit), true, puzzle.variants ? index : draft().variant);
     return;
   }
 });
@@ -336,7 +348,7 @@ function resetAttempt() {
   if (!editable()) return;
   const initial = getPuzzle(visitor.selected).kind === 'free' ? draft().circuit.initial : getPuzzle(visitor.selected).starter.initial;
   selectedIndex = null;
-  commit({ initial: [...initial], operations: [] }, false, 0);
+  commit({ initial: [...initial], operations: [] }, false, getPuzzle(visitor.selected).variants ? draft().variant : 0);
 }
 
 function resetSession() {
@@ -379,7 +391,8 @@ function evaluate(): Feedback {
     saveVisitor();
     return { tone: result.solved ? 'success' : 'info', text: result.solved ? 'Both compared! Same 50/50 chances, different phases: H then P points along +y; P then H points along +x.' : 'One order explored. Launch the other circuit and compare its state.' };
   }
-  const feedback = targetFeedback(run!.state, puzzle.target!);
+  const feedback = puzzle.mapping ? mappingFeedback(run!.circuit, puzzle.mapping)
+    : targetFeedback(run!.state, puzzle.variants?.[run!.variant]?.target ?? puzzle.target!);
   if (feedback.tone === 'success') {
     if (puzzle.kind === 'two-ways') {
       // Two different recipes count, even if their unitaries are equivalent.
@@ -422,9 +435,9 @@ function launch() {
   stopTimer();
   const current = draft();
   const puzzle = getPuzzle(visitor.selected);
-  const circuit = cloneCircuit(current.circuit);
+  const circuit = launchCircuit(current.circuit, puzzle);
   const frames = simulate(circuit);
-  run = { version: 2, revision, runId: crypto.randomUUID(), puzzleId: puzzle.id, title: puzzle.title, goal: puzzle.goal, circuit, frames, state: frames[0], step: 0, status: 'playing', example: current.example, variant: current.variant, feedback: null };
+  run = { version: 2, revision, runId: crypto.randomUUID(), puzzleId: puzzle.id, title: puzzle.title, goal: puzzle.variants?.[current.variant]?.goal ?? puzzle.goal, circuit, frames, state: frames[0], step: 0, status: 'playing', example: current.example, variant: current.variant, feedback: null };
   selectedIndex = null;
   notice = '';
   editing = false;
@@ -482,7 +495,9 @@ app.addEventListener('click', event => {
   if (data.index !== undefined) { pendingControls = []; selectedIndex = Number(data.index); render(); return; }
   if (data.variant !== undefined) {
     const variant = Number(data.variant);
-    visitor.drafts[visitor.selected] = { circuit: cloneCircuit(getPuzzle(visitor.selected).examples[variant].circuit), example: false, variant };
+    const puzzle = getPuzzle(visitor.selected);
+    if (puzzle.variants) { commit(cloneCircuit(draft().circuit), draft().example, variant); return; }
+    visitor.drafts[visitor.selected] = { circuit: cloneCircuit(puzzle.examples[variant].circuit), example: false, variant };
     notice = ''; saveVisitor(); render(); return;
   }
   if (data.qubits) {

@@ -18,7 +18,7 @@ The built app and all its assets run locally. After setup, internet access is un
 
 ## Play
 
-- Choose one of puzzles **1–6**, or choose **Free play** with one, two, or three qubits.
+- Choose one of puzzles **1–10**, or choose **Free play** with one, two, or three qubits.
 - Select a gate, then click near a wire, or drag roughly to the desired position. A selected gate also has move/delete controls, so dragging is optional.
 - To control any gate, choose **Control**, click a wire, then choose a gate and place it on another wire. Repeat Control on a second wire for a doubly controlled gate. You can also drag Control and gates onto wires. The gate acts only when all its controls are `1`; Escape cancels unfinished controls.
 - With **CNOT**, place it on the target wire. In a three-qubit circuit, select the gate and choose its **Control** wire below the circuit. Dragging keeps the existing control when possible; **Reverse direction** swaps the target and control.
@@ -28,7 +28,7 @@ The built app and all its assets run locally. After setup, internet access is un
 - **Reset** clears the drafts and progress and returns both screens to the beginning. Both screens also reset after **3 minutes without interaction** on either screen. Mouse, touch, keyboard, and scrolling renew the timer; automatic playback does not. Drafts/progress otherwise survive a builder refresh for this browser session. Refreshing during playback restores it paused.
 - The default display runs a **12-second demo**: four single-qubit gates, a pause to read the probabilities, then one sampled measurement and a reset. Any interaction on either screen stops it until the three-minute inactivity reset. Demo measurements are separate from visitor experiments and never change drafts or progress.
 
-Puzzle 3 asks for two distinct successful gate sequences. Puzzle 4 compares two fixed circuits. Puzzle 5 begins directly in `|+⟩`. In puzzle 6, centered Bloch vectors describe the individual entangled qubits; the joint state is shown in the amplitude table.
+Puzzle 3 asks for two distinct successful gate sequences. Puzzle 4 compares two fixed circuits. Puzzle 5 begins directly in `|+⟩`. In puzzle 6, centered Bloch vectors describe the individual entangled qubits; the joint state is shown in the amplitude table. Puzzles 7 (AND) and 10 (SWAP) check the operation across the required inputs, including relative phases. Puzzle 8 makes an equal two-qubit superposition. In puzzle 9, choose the outcome to mark and build its phase-flip circuit; Run appends the fixed Grover steps from the worksheet.
 
 The top wire is `q0`, the **leftmost bit** in the outcome. Two-qubit outcomes run from `00` to `11`; three-qubit outcomes run from `000` to `111`. Each wire has its own Bloch sphere. The worksheet's `P` gate is `diag(1, i)`, also called `S`.
 
@@ -56,4 +56,4 @@ The compact numerical checks use Node's built-in test runner. There is no browse
 - Open/refresh the monitor during a run; refresh the builder during playback; confirm paused restoration and draft preservation.
 - Click **Reset** and verify that both windows reset.
 
-Puzzle content follows *Quantum Puzzles.pdf* and the *Bubble Computer and QC cheat sheet.pdf* supplied for this project. Palette and lightweight setup are inspired by [math-viz](https://github.com/AdityaMorolia/math-viz). Bubble Computer, puzzles 7–10, random sampling, custom gates, and circuits larger than three qubits are outside this version.
+Puzzle content follows *Quantum Puzzles.pdf* and the *Bubble Computer and QC cheat sheet.pdf* supplied for this project. Palette and lightweight setup are inspired by [math-viz](https://github.com/AdityaMorolia/math-viz). Bubble Computer, random sampling, custom gates, and circuits larger than three qubits are outside this version.
