@@ -28,7 +28,7 @@ const undo: Record<string, Draft[]> = {};
 const helpTopics = {
   hint: { title: 'Hint', subtitle: '' },
   solution: { title: 'Show a solution', subtitle: 'See one way to do it' },
-  gates: { title: 'Gate guide', subtitle: 'Meet the building blocks' },
+  gates: { title: 'Gate guide', subtitle: '' },
 };
 type HelpTopic = keyof typeof helpTopics;
 let activeHelp: { topic: HelpTopic; puzzleId: string } | null = null;
@@ -196,7 +196,7 @@ function openHelp(topic: HelpTopic) {
     : topic === 'solution' ? puzzle.examples.map((ex, i) => `<div class="example-card"><strong>${escapeHtml(ex.label)}</strong><p>${escapeHtml(ex.explanation)}</p>${circuitSvg(ex.circuit)}${puzzle.kind !== 'compare' ? `<button class="outline-button" data-example="${i}" ${disable(!editable())}>Load example</button>` : ''}</div>`).join('') || '<p>There is no right answer here. Try a gate, then see what changes.</p>'
     : `<dl class="gate-guide"><div><dt>Control</dt><dd>Choose one or two control wires, then place any gate on another wire. It acts when all controls are |1⟩.</dd></div>${GATES.map(g => `<div><dt class="${gateClass(g.gate)}">${g.gate}</dt><dd>${escapeHtml(g.description)}</dd></div>`).join('')}</dl><p class="help-footnote">Amplitudes include signs and phases. Squaring their size gives the chance of each outcome. Overall phase does not change a physical state.</p>`;
   activeHelp = { topic, puzzleId: puzzle.id };
-  helpDialog.innerHTML = `<div class="help-dialog-header"><div><span class="eyebrow">${escapeHtml(puzzle.title)}</span><h2 id="help-dialog-title">${title}</h2>${subtitle ? `<p class="help-dialog-subtitle">${subtitle}</p>` : ''}</div><button class="help-dialog-close" data-close-help aria-label="Close ${title.toLowerCase()}" autofocus><span aria-hidden="true">×</span></button></div><div class="help-content">${content}</div>`;
+  helpDialog.innerHTML = `<div class="help-dialog-header"><div>${topic !== 'gates' ? `<span class="eyebrow">${escapeHtml(puzzle.title)}</span>` : ''}<h2 id="help-dialog-title">${title}</h2>${subtitle ? `<p class="help-dialog-subtitle">${subtitle}</p>` : ''}</div><button class="help-dialog-close" data-close-help aria-label="Close ${title.toLowerCase()}" autofocus><span aria-hidden="true">×</span></button></div><div class="help-content">${content}</div>`;
   if (!helpDialog.open) helpDialog.show();
   render();
 }
