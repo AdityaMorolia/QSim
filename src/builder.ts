@@ -3,7 +3,7 @@ import brandLogo from '../assets/NQCH LOGO_Singapore_gradient_reverse.png';
 import { MAX_QUBITS, STEP_MS, SESSION_KEY } from './config.ts';
 import type { Circuit, Feedback, GateKind, Operation, Puzzle, Run } from './types.ts';
 import { PUZZLES, GATES, getPuzzle, cloneCircuit } from './puzzles.ts';
-import { blochVector, circuitColumns, circuitSignature, controlWires, isValidCircuit, mappingFeedback, simulate, targetFeedback } from './quantum.ts';
+import { circuitColumns, circuitSignature, controlWires, isValidCircuit, mappingFeedback, simulate, targetFeedback } from './quantum.ts';
 import { blochSvg, circuitSvg, escapeHtml, probabilityMarkup } from './render.ts';
 import { createSync, nextRevision, readSnapshot } from './sync.ts';
 
@@ -176,14 +176,10 @@ function resultsMarkup(changed: boolean) {
   // Follow the same revealed frame as the display, even while a new draft is edited.
   const { circuit, state, title } = run;
   const qubits = circuit.initial.length;
-  const entangled = qubits > 1 && circuit.initial.some((_, index) => {
-    const { x, y, z } = blochVector(state, index);
-    return Math.hypot(x, y, z) < 1 - 1e-8;
-  });
   const panel = (kind: string, body: string) => `<div class="builder-results qubits-${qubits}">${changed ? `<p class="results-context">Last run: ${escapeHtml(title)} · Run to update.</p>` : ''}<section class="results-panel ${kind}-panel">${body}</section></div>`;
   return {
-    probabilities: panel('measurement', `<div class="panel-heading"><h2>If measured now</h2></div>${probabilityMarkup(state)}<p class="results-caption">Exact chances. No measurement has been taken.</p>`),
-    bloch: panel('bloch', `<div class="panel-heading"><h2>${qubits === 1 ? 'A view of the state' : 'Each qubit on its own'}</h2></div><div class="sphere-grid">${circuit.initial.map((_, index) => `<div class="qubit-sphere"><div class="qubit-label">q${index}<span>${qubits === 1 ? 'Bloch sphere' : index === 0 ? 'Top wire' : index === qubits - 1 ? 'Bottom wire' : 'Middle wire'}</span></div>${blochSvg(state, index)}</div>`).join('')}</div><p class="results-caption">${entangled ? 'Shorter vectors indicate entanglement with other qubits.' : 'The direction reveals changes you can’t see in the chances.'}</p>`),
+    probabilities: panel('measurement', `<div class="panel-heading"><h2>Measurement probabilities</h2></div>${probabilityMarkup(state)}<p class="results-caption">Exact chances. No measurement has been taken.</p>`),
+    bloch: panel('bloch', `<div class="panel-heading"><h2>Bloch spheres</h2></div><div class="sphere-grid">${circuit.initial.map((_, index) => `<div class="qubit-sphere">${blochSvg(state, index)}</div>`).join('')}</div>`),
   };
 }
 
