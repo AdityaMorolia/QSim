@@ -14,7 +14,19 @@ npm run preview
 
 Open the local address printed by Vite. Click **Open display**, move that window onto the extended monitor/projector, and use the browser’s fullscreen command to hide its toolbar. The display always fills the browser window and has no fullscreen toggle; browser rules prevent a page from forcing true fullscreen on load. Keep the builder and display in the **same browser profile and on the same origin** (host and port). One builder controls the display; separate computers are not supported. The browser may need permission to open the display window.
 
-The built app and all its assets run locally. After setup, internet access is unnecessary; keep the preview server running during the booth. To work on the app, use `npm run dev` instead.
+The built app and all its assets run locally. After setup, internet access is unnecessary. Keep the preview server running until **Available offline** appears; after that, the same address can reopen from the browser's saved copy. To work on the app, use `npm run dev` instead; offline saving is disabled in development.
+
+## Save for offline use
+
+1. Run `npm run build` and publish the complete `dist` folder to an **HTTPS** website. The build automatically generates `sw.js` alongside both pages. Local preview on `localhost` or `127.0.0.1` also works.
+2. On each computer or iPad, open the website in a normal browser window and wait for **Available offline**. This saves both the builder and display, their code, styles and images. The confirmation disappears after eight seconds; reload to check again. If saving fails, reconnect and reload.
+3. Bookmark the full address, ending in `/` or `/index.html`, and reopen that bookmark in the same browser/profile without internet. No local server is needed for a saved hosted copy. On iPad, you can also add it to the Home Screen; open that icon while online and wait for its own confirmation before disconnecting.
+
+New versions download in the background when online. Close **all** simulator tabs/windows and reopen to switch to a fully saved update; a failed update keeps the previous version. Caches are specific to the website's folder, including deployments under `/qsim/`.
+
+Saving the app does not change how drafts/progress or the inactivity reset work. Clearing website data removes the saved app and progress. Browser storage can also be evicted; persistent storage is requested where supported, but the browser decides whether to grant it. If **Offline copy incomplete** appears, clear this site's data and reopen online to save a fresh copy. Avoid private browsing for offline use.
+
+Before relying on it, disconnect after saving, close and reopen the builder, open the display, and run a puzzle. Check this on the actual iPad too. To check an update, publish a new build while the old one is open, revisit online, then close all simulator windows and reopen offline.
 
 ## Play
 

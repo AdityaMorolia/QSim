@@ -43,3 +43,6 @@ h1, h2, h3, p { margin-top: 0; }
 .display-feedback.retry .feedback-dot { background: #c69b62; }
 .display-feedback.neutral { color: #617184; font-weight: 400; }
 .display-feedback.neutral .feedback-dot { background: #a5b0bb; }
+.offline-status { position: fixed; right: 12px; bottom: 12px; z-index: 10; max-width: calc(100vw - 24px); padding: 6px 10px; border: 1px solid var(--border); border-radius: 6px; background: #fbfbfa; color: #617184; font-size: 12px; line-height: 1.4; pointer-events: none; }
+.offline-status[data-state="ready"] { color: #007f75; }
+.offline-status[data-state="error"] { color: #916232; }

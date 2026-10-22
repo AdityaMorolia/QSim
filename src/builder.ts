@@ -1,4 +1,5 @@
 import './style.css';
+import './offline.ts';
 import brandLogo from '../assets/NQCH LOGO_Singapore_gradient_reverse.png';
 import { MAX_QUBITS, STEP_MS, SESSION_KEY } from './config.ts';
 import type { Circuit, Feedback, GateKind, Operation, Puzzle, Run } from './types.ts';

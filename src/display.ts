@@ -1,4 +1,5 @@
 import './shared.css';
+import './offline.ts';
 import './display.css';
 import brandLogo from '../assets/NQCH LOGO_Singapore_gradient_reverse.png';
 import type { Circuit, PublishedSnapshot, SingleGate, State } from './types.ts';
