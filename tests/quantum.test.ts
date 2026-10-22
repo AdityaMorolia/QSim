@@ -179,7 +179,7 @@ test('representative frames stay normalized without mutating their inputs', () =
 });
 
 test('circuit validation rejects unsupported sizes, gates, and wire references', () => {
-  for (const invalid of [null, {}, { initial: [], operations: [] }, { initial: ['0', '0', '0', '0'], operations: [] }, { initial: ['1'], operations: [] }, ...[
+  for (const invalid of [null, {}, { initial: [], operations: [] }, { initial: ['0', '0', '0', '0'], operations: [] }, { initial: ['2'], operations: [] }, ...[
     { gate: 'H', target: 1 }, { gate: 'H', target: -1 }, { gate: 'H', target: 0.5 }, { gate: 'T', target: 0 }, { gate: 'toString', target: 0 }, { gate: 'CNOT', control: 0, target: 0 }, { gate: 'CNOT', control: 1, target: 0 },
   ].map(operation => ({ initial: ['0'], operations: [operation] }))]) assert.equal(isValidCircuit(invalid), false);
   assert.equal(isValidCircuit({ initial: ['0', '+'], operations: [{ gate: 'CNOT', control: 1, target: 0 }] }), true);

@@ -12,7 +12,7 @@ export function isValidSnapshot(value: unknown): value is PublishedSnapshot {
   if ('welcome' in value) return value.welcome === true;
   if (!isValidCircuit(value.circuit)) return false;
   if (!['runId', 'puzzleId', 'title', 'goal'].every(key => typeof value[key] === 'string')) return false;
-  if (typeof value.example !== 'boolean' || ![0, 1].includes(value.variant as number)) return false;
+  if (typeof value.example !== 'boolean' || ![0, 1, 2, 3].includes(value.variant as number)) return false;
   const orders = circuitColumns(value.circuit).length;
   if (!Number.isInteger(value.step) || (value.step as number) < 0 ||
       (value.step as number) > orders) return false;

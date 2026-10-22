@@ -1,5 +1,5 @@
 import type { Circuit, State } from './types.ts';
-import { circuitColumns, blochVector, canonicalState, formatAmplitude, probabilities } from './quantum.ts';
+import { circuitColumns, blochVector, canonicalState, controlWires, formatAmplitude, probabilities } from './quantum.ts';
 
 export function escapeHtml(value: string): string {
   return value.replace(/[&<>"']/g, character => ({ '&': '&amp;', '<': '&lt;', '>': '&gt;', '"': '&quot;', "'": '&#39;' })[character]!);
@@ -25,39 +25,41 @@ export function circuitSvg(circuit: Circuit, step = -1): string {
   const last = step - 1;
   const appliedWires = (columns[last] ?? []).flatMap(index => {
     const op = circuit.operations[index];
-    return op.gate === 'CNOT' ? [op.target, op.control] : [op.target];
+    return [op.target, ...controlWires(op)];
   });
   const firstWire = Math.min(...appliedWires), lastWire = Math.max(...appliedWires);
   const highlight = appliedWires.length
     ? `<rect x="${gateX(last) - 35}" y="${wireY(firstWire) - 28}" width="70" height="${(lastWire - firstWire) * wireSpacing + 56}" rx="12" fill="#e8eff8" />` : '';
   const wires = circuit.initial.map((initial, qubit) => `<g>
-    <text x="12" y="${wireY(qubit) + 6}" fill="#6e7477" font-size="15">q${qubit}</text>
-    <text x="54" y="${wireY(qubit) + 7}" fill="#24354b" font-size="23">|${initial}⟩</text>
+    <text x="12" y="${wireY(qubit) + 6}" fill="#6e7477" font-size="16.5">q${qubit}</text>
+    <text x="54" y="${wireY(qubit) + 7}" fill="#24354b" font-size="25.3">|${initial}⟩</text>
     <line x1="105" y1="${wireY(qubit)}" x2="${width - 20}" y2="${wireY(qubit)}" stroke="#cbd3dc" stroke-width="2" />
   </g>`).join('');
-  const gates = columns.map((indices, column) => `<g data-order="${column + 1}">${[...indices].sort((a, b) => Number(circuit.operations[b].gate === 'CNOT') - Number(circuit.operations[a].gate === 'CNOT')).map(index => {
+  const gates = columns.map((indices, column) => `<g data-order="${column + 1}">${[...indices].sort((a, b) => Number(controlWires(circuit.operations[b]).length > 0) - Number(controlWires(circuit.operations[a]).length > 0)).map(index => {
     const operation = circuit.operations[index];
     const x = gateX(column);
     const y = wireY(operation.target);
     const color = gateColors[operation.gate];
     const pending = step >= 0 && column >= step;
-    const label = operation.gate === 'CNOT' ? `CNOT, q${operation.control} controls q${operation.target}` : `${operation.gate} on q${operation.target}`;
+    const controls = controlWires(operation);
+    const label = controls.length ? `${operation.gate}, ${controls.map(qubit => `q${qubit}`).join(' and ')} control${controls.length === 1 ? 's' : ''} q${operation.target}` : `${operation.gate} on q${operation.target}`;
+    const control = controls.length
+      ? `<line x1="${x}" y1="${wireY(Math.min(operation.target, ...controls))}" x2="${x}" y2="${wireY(Math.max(operation.target, ...controls))}" stroke="${color}" stroke-width="3" />
+         ${controls.map(qubit => `<circle cx="${x}" cy="${wireY(qubit)}" r="7" fill="${color}" />`).join('')}` : '';
     const symbol = operation.gate === 'CNOT'
-      ? `<line x1="${x}" y1="${wireY(operation.control)}" x2="${x}" y2="${y}" stroke="${color}" stroke-width="3" />
-         <circle cx="${x}" cy="${wireY(operation.control)}" r="7" fill="${color}" />
-         <circle cx="${x}" cy="${y}" r="20" fill="#fbfbfa" stroke="${color}" stroke-width="3" />
+      ? `<circle cx="${x}" cy="${y}" r="20" fill="#fbfbfa" stroke="${color}" stroke-width="3" />
          <path d="M ${x - 12} ${y} H ${x + 12} M ${x} ${y - 12} V ${y + 12}" stroke="${color}" stroke-width="3" />`
       : `<rect x="${x - 24}" y="${y - 24}" width="48" height="48" rx="9" fill="${pending ? '#fbfbfa' : color}" stroke="${color}" stroke-width="1.5" />
-         <text x="${x}" y="${y + 8}" text-anchor="middle" font-size="25" font-weight="600" fill="${pending ? color : 'white'}">${operation.gate}</text>`;
-    return `<g><title>${label}</title>${symbol}</g>`;
+         <text x="${x}" y="${y + 8}" text-anchor="middle" font-size="27.5" font-weight="600" fill="${pending ? color : 'white'}">${operation.gate}</text>`;
+    return `<g><title>${label}</title>${control}${symbol}</g>`;
   }).join('')}</g>`).join('');
-  const empty = count === 0 ? `<text x="${width / 2 + 35}" y="${wireY(0) - 15}" text-anchor="middle" fill="#7b858c" font-size="16">Initial state · no gates yet</text>` : '';
-  const description = columns.map(indices => indices.map(index => { const operation = circuit.operations[index]; return operation.gate === 'CNOT' ? `CNOT from q${operation.control} to q${operation.target}` : `${operation.gate} on q${operation.target}`; }).join(' and ')).join(', then ');
-  return `<svg class="circuit-diagram" viewBox="0 0 ${width} ${height}" role="img" aria-label="${circuit.initial.length}-qubit circuit with ${count} gates${description ? `. ${description}.` : ''}" xmlns="http://www.w3.org/2000/svg" style="--circuit-width:${width}px;display:block;width:100%;font-family:inherit">${highlight}${wires}${gates}${empty}</svg>`;
+  const empty = count === 0 ? `<text x="${width / 2 + 35}" y="${wireY(0) - 15}" text-anchor="middle" fill="#7b858c" font-size="17.6">Initial state · no gates yet</text>` : '';
+  const description = columns.map(indices => indices.map(index => { const operation = circuit.operations[index]; const controls = controlWires(operation); return controls.length ? `${operation.gate === 'CNOT' ? 'CNOT' : `${controls.length > 1 ? 'doubly controlled' : 'controlled'} ${operation.gate}`} from ${controls.map(qubit => `q${qubit}`).join(' and ')} to q${operation.target}` : `${operation.gate} on q${operation.target}`; }).join(' and ')).join(', then ');
+  return `<svg class="circuit-diagram" viewBox="0 0 ${width} ${height}" role="img" aria-label="${circuit.initial.length}-qubit circuit with ${count} gates${description ? `. ${description}.` : ''}" xmlns="http://www.w3.org/2000/svg" style="--circuit-width:${width}px;--circuit-aspect:${width / height};display:block;width:100%;font-family:inherit">${highlight}${wires}${gates}${empty}</svg>`;
 }
 
 /** Fixed orthographic camera; never normalize a reduced state to the sphere's surface. */
-export function blochSvg(state: State, qubit: number): string {
+export function blochSvg(state: State, qubit: number, viewHeight = 285): string {
   const { x, y, z } = blochVector(state, qubit);
   const cx = 150, cy = 139, radius = 93;
   const project = (a: number, b: number, c: number): [number, number] => [
@@ -72,21 +74,19 @@ export function blochSvg(state: State, qubit: number): string {
     const end = project(a * 1.18, b * 1.18, c * 1.18);
     const start = project(-a, -b, -c);
     return `<line x1="${start[0]}" y1="${start[1]}" x2="${end[0]}" y2="${end[1]}" stroke="#b6c1ca" stroke-width="1.2" stroke-dasharray="3 4" />
-      <text x="${end[0] + (a ? -12 : b ? 12 : 14)}" y="${end[1] + (a || b ? 7 : 3)}" text-anchor="middle" fill="#65768a" font-size="15">${label}</text>`;
+      <text x="${end[0] + (a ? -12 : b ? 12 : 14)}" y="${end[1] + (a || b ? 7 : 3)}" text-anchor="middle" fill="#65768a" font-size="16.5">${label}</text>`;
   };
   const vector = length < 1e-8
     ? `<circle cx="${cx}" cy="${cy}" r="7" fill="#0c4f9b" /><circle cx="${cx}" cy="${cy}" r="13" fill="none" stroke="#0c4f9b" stroke-opacity=".16" stroke-width="6" />`
     : `<line x1="${cx}" y1="${cy}" x2="${point[0]}" y2="${point[1]}" stroke="#0c4f9b" stroke-width="3.5" stroke-linecap="round" />
        <circle cx="${point[0]}" cy="${point[1]}" r="6" fill="#0c4f9b" stroke="white" stroke-width="2" />`;
-  return `<svg class="bloch-sphere" viewBox="${state.length === 8 ? '30 0 240 285' : '0 0 300 285'}" role="img" aria-label="Qubit ${qubit} Bloch vector: x ${fixed(x)}, y ${fixed(y)}, z ${fixed(z)}${length < 1e-8 ? ', at the center' : ''}${mixed ? ', entangled with other qubits' : ', pure local state'}" xmlns="http://www.w3.org/2000/svg">
+  return `<svg class="bloch-sphere" viewBox="${state.length === 8 ? '30 0 240' : '0 0 300'} ${viewHeight}" role="img" aria-label="Qubit ${qubit} Bloch vector: x ${fixed(x)}, y ${fixed(y)}, z ${fixed(z)}${length < 1e-8 ? ', at the center' : ''}${mixed ? ', entangled with other qubits' : ', pure local state'}" xmlns="http://www.w3.org/2000/svg">
     <circle cx="${cx}" cy="${cy}" r="${radius}" fill="#f0f4f8" fill-opacity=".65" stroke="#b9c8d5" stroke-width="1.3" />
     <ellipse cx="${cx}" cy="${cy}" rx="${radius}" ry="${radius * 0.3420201433}" fill="none" stroke="#bdcbd8" stroke-width="1.1" />
     <ellipse cx="${cx}" cy="${cy}" rx="${radius * .36}" ry="${radius}" fill="none" stroke="#d6dfe6" stroke-width="1" />
     ${axis(1, 0, 0, 'x')}${axis(0, 1, 0, 'y')}${axis(0, 0, 1, 'z')}
-    <text x="${cx - 16}" y="31" text-anchor="end" fill="#24354b" font-size="18">|0⟩</text>
-    <text x="${cx + 14}" y="253" fill="#24354b" font-size="18">|1⟩</text>
+    <text x="${cx - 16}" y="31" text-anchor="end" fill="#24354b" font-size="19.8">|0⟩</text>
     <circle cx="${cx}" cy="${cy}" r="3" fill="#8496a8" />${vector}
-    <text x="${cx}" y="278" text-anchor="middle" fill="#617184" font-size="12" font-family="ui-monospace, monospace">x ${fixed(x)} · y ${fixed(y)} · z ${fixed(z)}</text>
   </svg>`;
 }
 
